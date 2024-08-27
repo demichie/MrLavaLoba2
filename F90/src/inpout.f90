@@ -699,8 +699,8 @@ CONTAINS
 
     OPEN(output_unit,FILE=TRIM(output_file),status='unknown',form='formatted')
 
-    out_cells_x = size(out_array, 1)
-    out_cells_y = size(out_array, 2)
+    out_cells_y = size(out_array, 1)
+    out_cells_x = size(out_array, 2)
     
     WRITE(output_unit,'(A,I5)') 'ncols ', out_cells_x
     WRITE(output_unit,'(A,I5)') 'nrows ', out_cells_y
@@ -711,7 +711,7 @@ CONTAINS
 
     DO j = out_cells_y,1,-1
 
-       WRITE(output_unit,'(2000ES12.3E3)') out_array(1:out_cells_x,j)
+       WRITE(output_unit,'(2000ES12.3E3)') out_array(j,1:out_cells_x)
 
     ENDDO
 

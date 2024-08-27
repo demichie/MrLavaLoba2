@@ -170,9 +170,7 @@ CONTAINS
     ALLOCATE( iWest_array(alloc_n_lobes) )
 
     ALLOCATE( Ztot(ny,nx) ,  Zflow(ny,nx) )
-
     ALLOCATE( Zflow_local_array(alloc_n_lobes,max_cells,max_cells) )
-
 
     RETURN
 
@@ -376,6 +374,7 @@ CONTAINS
                (Ztopo(iy, ix1) == nd) .OR. (Ztopo(iy1, ix) == nd) ) THEN
 
              last_lobe = i - 1
+
              EXIT         
 
           END IF
@@ -391,6 +390,8 @@ CONTAINS
           CALL step4and5(new_angle, angle(idx), x1(idx), x2(idx), x(idx),       &
                y(idx), zidx, cos_angle1, sin_angle1, check_step, x(i), y(i),    &
                x1(i), x2(i), angle(i))
+
+          ! WRITE(*,*) 'x1(i), x2(i)',x1(i), x2(i)
 
           IF (.NOT.check_step) THEN
 
@@ -1069,9 +1070,9 @@ CONTAINS
 
     ! Interpolate the elevation at the corners of the pixel to find the
     ! elevation at the lobe center
-    zidx = xi_fract * (yi_fract*Ztot(ix1, iy1) + (1.0-yi_fract) *               &
-         Ztot(ix1, iy)) + (1.0-xi_fract) * (yi_fract*Ztot(ix, iy1) +            &
-         (1.0-yi_fract) * Ztot(ix, iy))
+    zidx = xi_fract * (yi_fract*Ztot(iy1, ix1) + (1.0-yi_fract) *               &
+         Ztot(iy, ix1)) + (1.0-xi_fract) * (yi_fract*Ztot(iy1, ix) +            &
+         (1.0-yi_fract) * Ztot(iy, ix))
 
     ! Compute the points of the lobe
     call ellipse(x_idx, y_idx, ax1, ax2, angle, xe, ye)
@@ -1094,10 +1095,10 @@ CONTAINS
        ixe1 = ixe + 1
        iye1 = iye + 1
 
-       ze(i) = xei_fract * (yei_fract * Ztot(ixe1, iye1) +                      &
-            (1.0_wp - yei_fract) * Ztot(ixe1, iye)) +                           &
-            (1.0_wp - xei_fract) * (yei_fract * Ztot(ixe, iye1) +               &
-            (1.0_wp - yei_fract) * Ztot(ixe, iye))
+       ze(i) = xei_fract * (yei_fract * Ztot(iye1, ixe1) +                      &
+            (1.0_wp - yei_fract) * Ztot(iye, ixe1)) +                           &
+            (1.0_wp - xei_fract) * (yei_fract * Ztot(iye1, ixe) +               &
+            (1.0_wp - yei_fract) * Ztot(iye, ixe))
 
     END DO
 
@@ -1197,7 +1198,7 @@ CONTAINS
     real(wp), intent(out) :: cos_angle1, sin_angle1, new_angle
 
     ! Local variables
-    real(wp) :: cos_angle2, sin_angle2, alfa_inertial, x_avg, y_avg, angle_avg
+    real(wp) :: cos_angle2, sin_angle2, alfa_inertial, x_avg, y_avg
 
     ! STEP 3: ADD THE EFFECT OF INERTIA
     ! Cosine and sine of the angle of the parent lobe
@@ -1224,9 +1225,11 @@ CONTAINS
     y_avg = (1.0_wp - alfa_inertial) * sin_angle2 + alfa_inertial * sin_angle1
 
     ! Calculate the new angle
-    angle_avg = mod( atan2d(y_avg, x_avg), 360.0_wp)
-    new_angle = angle_avg
 
+    new_angle = modulo( atan2d(y_avg, x_avg), 360.0_wp)
+
+    RETURN
+    
   end subroutine step3
 
   subroutine step4and5(new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,      &
@@ -1312,6 +1315,9 @@ CONTAINS
        ! Calculate the slope
        slope = max(0.0_wp, (zidx - ze) / sqrt(delta_x**2 + delta_y**2))
 
+       !WRITE(*,*) 'zidx,ze',zidx,ze
+       !WRITE(*,*) 'slope',slope
+       
        ! Compute the semi-axes of the new lobe
        CALL compute_semiaxis(slope,new_x1, new_x2)
 
