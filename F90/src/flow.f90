@@ -1,0 +1,1363 @@
+!********************************************************************************
+!> \brief Flow parameters and procedures
+!
+!> This module contains the parameters for numerical solution of the
+!> model.
+!********************************************************************************
+MODULE flow
+
+  USE parameters, ONLY : wp
+
+  IMPLICIT NONE
+
+  !> number of lobes
+  INTEGER :: alloc_n_lobes
+
+  !> orientation angles of the lobes
+  REAL(wp), ALLOCATABLE :: angle(:)
+
+  !> x-coordinate of the center of the lobes
+  REAL(wp), ALLOCATABLE :: x(:)
+
+  !> x-coordinate of the center of the lobes
+  REAL(wp), ALLOCATABLE :: y(:)
+
+  !> first semi-axis of the lobes
+  REAL(wp), ALLOCATABLE :: x1(:)
+
+  !> first semi-axis of the lobes
+  REAL(wp), ALLOCATABLE :: x2(:)
+
+  !> thickness of the lobes
+  REAL(wp), ALLOCATABLE :: h(:)
+
+  !> distances (in lobes) from the vent
+  INTEGER, ALLOCATABLE :: dist_int(:)
+
+  !> number of descendents of the lobes
+  INTEGER, ALLOCATABLE :: descendents(:)
+
+  !> index of parent of the lobes
+  INTEGER, ALLOCATABLE :: parent(:)
+
+  !> Topography+flow elevation 
+  REAL(wp), ALLOCATABLE :: Ztot(:,:)
+
+  !> Flow thickness
+  REAL(wp), ALLOCATABLE :: Zflow(:,:)
+
+  !> Map of lobe distances from the vent
+  INTEGER, ALLOCATABLE :: Dist(:,:)
+
+  !> Bounding-box north indexes of the lobes
+  INTEGER, ALLOCATABLE :: jNorth_array(:)
+
+  !> Bounding-box south indexes of the lobes
+  INTEGER, ALLOCATABLE :: jSouth_array(:)
+
+  !> Bounding-box east indexes of the lobes
+  INTEGER, ALLOCATABLE :: iEast_array(:)
+
+  !> Bounding-box west indexes of the lobes
+  INTEGER, ALLOCATABLE :: iWest_array(:)
+
+  !> Local map of flow thickness for each lobe
+  REAL(wp), ALLOCATABLE :: Zflow_local_array(:,:,:)
+
+  !> Cumulative length of fissure
+  REAL(wp), ALLOCATABLE :: cum_fiss_length(:)
+
+  REAL(wp), ALLOCATABLE :: x_vent_end(:)
+  REAL(wp), ALLOCATABLE :: y_vent_end(:)
+
+  REAL(wp), ALLOCATABLE :: xv(:)
+  REAL(wp), ALLOCATABLE :: yv(:)
+
+  INTEGER :: max_cells
+  REAL(wp) :: max_semiaxis
+
+  INTEGER :: n_lobes_tot
+
+  REAL(wp) :: inv_cell
+
+CONTAINS
+
+
+  SUBROUTINE allocate_flow
+
+    USE parameters, ONLY : a_beta, b_beta, max_n_lobes, n_flows
+    USE parameters, ONLY : min_n_lobes, max_n_lobes
+    USE parameters, ONLY : nv, nv2, cell
+    USE parameters, ONLY : lobe_area, max_aspect_ratio
+    USE parameters, ONLY : nx, ny
+
+    IMPLICIT NONE
+
+    REAL(wp) :: beta_pdf(n_flows)
+    REAL(wp) :: x_beta(n_flows)
+
+    INTEGER :: i, j 
+
+    REAL(wp) :: xlin(nv), ylin(nv)
+
+    ! Logic for determining alloc_n_lobes
+    if (a_beta .LE. 0.0_wp .and. b_beta .LE. 0.0_wp) then
+
+       alloc_n_lobes = max_n_lobes
+
+    else
+
+       ! This would be a manual calculation or a call to a Fortran beta distribution function.
+       ! For simplicity, let's assume x_beta and beta_pdf have been calculated similarly as in Python.
+       ! Here we should manually calculate the values, for now using placeholder values.
+
+       ! Calculate x_beta (equivalent to np.rint(range(0, n_flows)) / (n_flows - 1))
+       do i = 1, n_flows
+          x_beta(i) = real(i - 1) / real(n_flows - 1)
+       end do
+
+       ! Calculate beta_pdf (you might need to implement or use a library for this)
+       ! Assuming placeholder beta_pdf values for this translation
+       beta_pdf = [0.1, 0.3, 0.5, 0.7, 0.9]
+
+       alloc_n_lobes = int(min_n_lobes + 0.5 * (max_n_lobes - min_n_lobes) * maxval(beta_pdf))
+
+       ! print *, 'Flow with the maximum number of lobes', maxloc(beta_pdf)
+
+    end if
+
+    ! print *, 'Maximum number of lobes', alloc_n_lobes
+
+    ALLOCATE( angle(alloc_n_lobes) , x(alloc_n_lobes) , y(alloc_n_lobes) )
+    ALLOCATE( x1(alloc_n_lobes) , x2(alloc_n_lobes) , h(alloc_n_lobes) )
+    ALLOCATE( dist_int(alloc_n_lobes) , descendents(alloc_n_lobes) )
+    ALLOCATE( parent(alloc_n_lobes) )
+
+    ! Create linspace equivalent (linearly spaced values)
+    do i = 1, nv
+       xlin(i) = -0.5 * cell + (i - 1) * cell / (nv - 1)
+       ylin(i) = -0.5 * cell + (i - 1) * cell / (nv - 1)
+    end do
+
+    ! Calculate the total number of grid points in the meshgrid
+    nv2 = nv * nv
+
+    ALLOCATE( xv(nv2) )
+    ALLOCATE( yv(nv2) )
+
+    ! Create meshgrid equivalent
+    do j = 1, nv
+       do i = 1, nv
+          xv((j-1)*nv + i) = xlin(i)
+          yv((j-1)*nv + i) = ylin(j)
+       end do
+    end do
+
+    ! Calculate the maximum semi-axis (equivalent to max_semiaxis in Python)
+    max_semiaxis = sqrt(lobe_area * max_aspect_ratio / 3.141592653589793)
+
+    inv_cell = 1.0_wp / cell
+
+    ! Calculate the maximum number of cells (equivalent to max_cells in Python)
+    max_cells = int(ceiling(2.0 * max_semiaxis * inv_cell)) + 2
+
+    ! Print the result (optional)
+    ! print *, 'Max Cells:', max_cells
+
+    ALLOCATE( jNorth_array(alloc_n_lobes) )
+    ALLOCATE( jSouth_array(alloc_n_lobes) )
+    ALLOCATE( iEast_array(alloc_n_lobes) )
+    ALLOCATE( iWest_array(alloc_n_lobes) )
+
+    ALLOCATE( Ztot(ny,nx) ,  Zflow(ny,nx) )
+
+    ALLOCATE( Zflow_local_array(alloc_n_lobes,max_cells,max_cells) )
+
+
+    RETURN
+
+
+  END SUBROUTINE allocate_flow
+
+
+  SUBROUTINE flow_loop
+
+    USE parameters, ONLY : nx,ny
+    USE parameters, ONLY : xcmin, ycmin
+    USE parameters, ONLY : nd
+    USE parameters, ONLY : Ztopo
+    USE parameters, ONLY : filling_parameter
+    USE parameters, ONLY : n_flows, n_init
+    USE parameters, ONLY : a_beta, b_beta
+    USE parameters, ONLY : min_n_lobes, max_n_lobes
+    USE parameters, ONLY : thickness_ratio, avg_lobe_thickness
+    USE parameters, ONLY : lobe_exponent
+
+    IMPLICIT NONE
+
+    INTEGER :: last_lobe
+
+    INTEGER :: i_flow
+    INTEGER :: i
+    REAL(wp) :: random_value
+    INTEGER :: n_lobes
+    REAL(wp) :: thickness_min
+    REAL(wp) :: delta_lobe_thickness
+
+    REAL(wp) :: max_slope_angle, slope
+
+    INTEGER :: i_West, i_East, j_South, j_North
+    INTEGER :: nx_local, ny_local
+    REAL(wp) :: Zflow_local(max_cells,max_cells)
+    integer :: Dist_local(max_cells,max_cells)
+    INTEGER :: Zflow_local_int(max_cells,max_cells)
+
+    REAL(wp) :: lobe_thickness
+
+    INTEGER :: idx
+
+    INTEGER :: ix, ix1
+    INTEGER :: iy, iy1
+    REAL(wp) :: xi, yi
+
+    REAL(wp) :: zidx
+    REAL(wp) :: temp_angle
+
+    REAL(wp) :: cos_angle1, sin_angle1
+    REAL(wp) :: new_angle
+
+    LOGICAL :: check_step
+
+
+    Ztot(1:ny,1:nx) = Ztopo(1:ny,1:nx)
+    Zflow(1:ny,1:nx) = 0.0_wp
+
+    n_lobes_tot = 0
+
+    DO i_flow = 1,n_flows
+
+       IF (n_flows>1) THEN
+
+          WRITE(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") ACHAR(13),              &
+               & " Percent Complete: " ,                                        &
+               ( REAL(i_flow) / REAL(n_flows))*100.0, "%"       
+
+       END IF
+
+       Zflow_local_array = 0.0_wp
+
+       if (a_beta .LE. 0.0_wp .and. b_beta .LE. 0.0_wp) then
+
+          ! Generate a random value uniformly distributed between min_n_lobes
+          ! and max_n_lobes
+          call random_seed()  ! Initialize the random number generator
+          call random_number(random_value)
+          random_value = min_n_lobes + (max_n_lobes-min_n_lobes) * random_value
+
+          ! Calculate n_lobes by rounding up and converting to integer
+          n_lobes = int(ceiling(random_value))
+
+
+       ELSE
+
+          ! TO DO
+          n_lobes = min_n_lobes
+
+       END if
+
+       ! Print the result (optional)
+       ! print *, 'Number of lobes:', n_lobes          
+
+       n_lobes_tot = n_lobes_tot + n_lobes
+
+       ! Calculate thickness_min
+       thickness_min = 2.0_wp * thickness_ratio /                               &
+            (thickness_ratio + 1.0_wp) * avg_lobe_thickness
+
+       ! Calculate delta_lobe_thickness
+       delta_lobe_thickness = 2.0_wp * &
+            (avg_lobe_thickness - thickness_min) / (n_lobes - 1.0_wp)
+
+       ! Print the results (optional)
+       !print *, 'Minimum Lobe Thickness:', thickness_min
+       !print *, 'Delta Lobe Thickness:', delta_lobe_thickness
+
+       DO i = 1,n_init
+
+          IF (n_flows==1) THEN
+
+             WRITE(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") ACHAR(13),              &
+                  & " Percent Complete: " ,                                        &
+                  ( REAL(i) / REAL(n_lobes))*100.0, "%"       
+
+          END IF
+
+          CALL first_lobe(i_flow, x(i), y(i))
+
+          dist_int(i) = 0
+          descendents(i) = 0
+
+          CALL step1A(x(i), y(i), max_slope_angle, slope)
+
+          CALL step2(slope, max_slope_angle, angle(i))
+
+          CALL compute_semiaxis(slope,x1(i), x2(i))
+
+          CALL rasterize(x(i), y(i), x1(i), x2(i), angle(i), dist_int(i),       &
+               i_West, i_East, j_South, j_North, Zflow_local, Dist_local,       &
+               Zflow_local_int)
+
+          ! compute the thickness of the lobe
+          lobe_thickness = thickness_min + (i - 1) * delta_lobe_thickness
+
+          ! WRITE(*,*) 'lobe_thickness ', lobe_thickness
+
+          nx_local = i_East - i_West + 1
+          ny_local = j_North - j_South + 1
+
+          ! update the thickness of the flow with the new lobe
+          Zflow(j_South:j_North, i_West:i_East) =                               &
+               Zflow(j_South:j_North, i_West:i_East)                            &
+               + lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
+
+          ! update the topography
+          Ztot(j_South:j_North, i_West:i_East) =                                &
+               Ztot(j_South:j_North, i_West:i_East)                             &
+               + filling_parameter(j_South:j_North, i_West:i_East)              &
+               * lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
+
+          ! store the bounding box of the new lobe
+          jNorth_array(i) = j_North
+          jSouth_array(i) = j_South
+
+          iEast_array(i) = i_East
+          iWest_array(i) = i_West
+
+       END DO
+
+       last_lobe = n_lobes
+
+       DO i = n_init+1,n_lobes
+
+          IF (n_flows==1) THEN
+
+             WRITE(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") ACHAR(13),              &
+                  & " Percent Complete: " ,                                        &
+                  ( REAL(i) / REAL(n_lobes))*100.0, "%"       
+
+          END IF
+
+          IF (lobe_exponent > 0) THEN
+
+             CALL step0(i, dist_int(1:i), idx)
+
+          ELSE
+
+             idx = i-1
+
+          END IF
+
+          ! save the index of the parent and the distance from first lobe of the
+          ! chain
+          parent(i) = idx
+          dist_int(i) = dist_int(idx) + 1
+
+          ! ix,iy are the indexes of the grid cell of the lobe center
+          CALL coorToIdx(x(idx), xcmin, inv_cell, ix, xi)
+          CALL coorToIdx(y(idx), ycmin, inv_cell, iy, yi)
+
+          ix1 = ix + 1
+          iy1 = iy + 1
+
+          ! stopping condition (lobe close the domain boundary)
+          IF ( (ix <= 0.5 * max_cells) .OR. (ix1 >= (nx - 0.5*max_cells)) .OR.  &
+               (iy <= 0.5 * max_cells) .OR. (iy1 >= (ny - 0.5*max_cells)) .OR.  &
+               (Ztopo(iy, ix) == nd) .OR. (Ztopo(iy1, ix1) == nd) .OR.          &
+               (Ztopo(iy, ix1) == nd) .OR. (Ztopo(iy1, ix) == nd) ) THEN
+
+             last_lobe = i - 1
+             EXIT         
+
+          END IF
+
+          CALL step1(xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx),          &
+               angle(idx), slope, max_slope_angle, zidx)
+
+          CALL step2(slope, max_slope_angle, temp_angle)
+
+          CALL step3(angle(idx),  temp_angle, slope, cos_angle1, sin_angle1,    &
+               new_angle)
+
+          CALL step4and5(new_angle, angle(idx), x1(idx), x2(idx), x(idx),       &
+               y(idx), zidx, cos_angle1, sin_angle1, check_step, x(i), y(i),    &
+               x1(i), x2(i), angle(i))
+
+          IF (.NOT.check_step) THEN
+
+             last_lobe = i-1
+             EXIT
+
+          END IF
+
+          CALL rasterize(x(i), y(i), x1(i), x2(i), angle(i), dist_int(i),       &
+               i_West, i_East, j_South, j_North, Zflow_local, Dist_local,       &
+               Zflow_local_int)
+
+          ! compute the thickness of the lobe
+          lobe_thickness = thickness_min + (i - 1) * delta_lobe_thickness
+
+          ! WRITE(*,*) 'lobe_thickness ', lobe_thickness
+
+          nx_local = i_East - i_West + 1
+          ny_local = j_North - j_South + 1
+
+          ! update the thickness of the flow with the new lobe
+          Zflow(j_South:j_North, i_West:i_East) =                               &
+               Zflow(j_South:j_North, i_West:i_East)                            &
+               + lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
+
+          ! update the topography
+          Ztot(j_South:j_North, i_West:i_East) =                                &
+               Ztot(j_South:j_North, i_West:i_East)                             &
+               + filling_parameter(j_South:j_North, i_West:i_East)              &
+               * lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
+
+          ! store the bounding box of the new lobe
+          jNorth_array(i) = j_North
+          jSouth_array(i) = j_South
+
+          iEast_array(i) = i_East
+          iWest_array(i) = i_West
+
+       END DO
+
+    END DO
+
+    WRITE(*,*)
+
+    RETURN
+
+  END SUBROUTINE flow_loop
+
+
+  subroutine init_fissure
+
+    USE parameters, ONLY : n_vents, fissure_probabilities, vent_flag
+    USE parameters, ONLY : x_vent, y_vent
+
+    implicit none
+
+    ! Local variables
+    REAL(wp) :: delta_xvent, delta_yvent
+    INTEGER :: j, first_j
+
+    ! Check for the presence of x_vent_end and y_vent_end
+    IF (allocated(x_vent_end) .and. size(x_vent_end) > 0 .and. vent_flag > 3)   &
+         THEN
+
+       first_j = 0
+       allocate(cum_fiss_length(n_vents + 1))
+
+    ELSE
+
+       first_j = 1
+       allocate(cum_fiss_length(n_vents))
+
+    END IF
+
+    cum_fiss_length = 0.0_wp
+
+    ! Loop over vents
+    do j = first_j, n_vents-1
+
+       if (allocated(x_vent_end) .and. size(x_vent_end) > 0 .and. vent_flag > 3)&
+            then
+
+          delta_xvent = x_vent_end(j+1) - x_vent(j+1)
+          delta_yvent = y_vent_end(j+1) - y_vent(j+1)
+          cum_fiss_length(j+1) = cum_fiss_length(j) + sqrt(delta_xvent**2 +     &
+               delta_yvent**2)
+
+       else
+
+          delta_xvent = x_vent(j+1) - x_vent(j)
+          delta_yvent = y_vent(j+1) - y_vent(j)
+          cum_fiss_length(j+1) = cum_fiss_length(j) + sqrt(delta_xvent**2 +     &
+               delta_yvent**2)
+
+       end if
+
+    end do
+
+    ! If x_vent_end is not allocated, set default values
+    if (.not. allocated(x_vent_end)) then
+       allocate(x_vent_end(1), y_vent_end(1))
+       x_vent_end = 0.0_wp
+       y_vent_end = 0.0_wp
+    end if
+
+    ! Normalize cum_fiss_length if there are more than one vents
+    if (n_vents > 1) then
+       cum_fiss_length(2:n_vents) = cum_fiss_length(2:n_vents) /                &
+            cum_fiss_length(n_vents)
+    end if
+
+    ! Handle fissure_probabilities if available
+    if (allocated(fissure_probabilities)) then
+       if (vent_flag == 8) then
+          cum_fiss_length = cumsum(fissure_probabilities)
+       elseif (vent_flag > 5) then
+          cum_fiss_length(2:n_vents) = cumsum(fissure_probabilities)
+       end if
+    end if
+
+    ! (Optional) Print the cumulative fissure lengths for debugging
+    ! print *, cum_fiss_length
+
+    RETURN
+
+  end subroutine init_fissure
+
+  pure function cumsum(a) result (r)
+    real(wp), intent(in) :: a(:)
+    real(wp) :: r(size(a))
+    integer :: i
+    r(:) = [(sum(a(1:i)),i=1,size(a))]
+  end function cumsum
+
+
+  subroutine first_lobe(i_flow, x_i, y_i)
+
+    USE parameters, ONLY : n_vents, x_vent, y_vent
+    USE parameters, ONLY : vent_flag
+    USE parameters, ONLY : n_flows
+
+    implicit none
+
+    ! Input
+    INTEGER, INTENT(IN) :: i_flow
+
+    ! Outputs
+    real(wp), intent(out) :: x_i, y_i
+
+    ! Local variables
+    integer :: i_vent, idx_vent, i_segment
+    real(wp) :: alfa_polyline, alfa_segment, num, den
+    real(wp) :: rand_val
+    real(wp) :: alfa_vent
+
+    ! Choose the initial lobe location based on the vent_flag value
+    if (n_vents == 1) then
+
+       x_i = x_vent(1)
+       y_i = y_vent(1)
+
+    else
+
+       select case (vent_flag)
+
+       case (0)
+          ! vent_flag = 0: initial lobes are on the vents coordinates
+          i_vent = int(floor(real(i_flow) * real(n_vents) / real(n_flows))) + 1
+          x_i = x_vent(i_vent)
+          y_i = y_vent(i_vent)
+
+       case (1)
+          ! vent_flag = 1: initial lobes are chosen randomly from the vents
+          call random_number(rand_val)
+          i_vent = int(rand_val * n_vents) + 1
+          x_i = x_vent(i_vent)
+          y_i = y_vent(i_vent)
+
+       case (2, 6)
+          ! vent_flag = 2 or 6: initial lobes on the polyline connecting vents
+          call random_number(alfa_polyline)
+          alfa_polyline = alfa_polyline * cum_fiss_length(n_vents)
+          idx_vent = 1
+          do while (cum_fiss_length(idx_vent) <= alfa_polyline)
+             idx_vent = idx_vent + 1
+          end do
+
+          num = alfa_polyline - cum_fiss_length(idx_vent - 1)
+          den = cum_fiss_length(idx_vent) - cum_fiss_length(idx_vent - 1)
+          alfa_segment = num / den
+
+          x_i = alfa_segment * x_vent(idx_vent) + &
+               (1.0 - alfa_segment) * x_vent(idx_vent - 1)
+
+          y_i = alfa_segment * y_vent(idx_vent) + &
+               (1.0 - alfa_segment) * y_vent(idx_vent - 1)
+
+       case (3)
+          ! vent_flag = 3: initial lobes on polyline with equal probability
+          call random_number(rand_val)
+          i_segment = int(rand_val * n_vents) + 1
+
+          call random_number(alfa_segment)
+
+          x_i = alfa_segment * x_vent(i_segment) + &
+               (1.0 - alfa_segment) * x_vent(i_segment - 1)
+
+          y_i = alfa_segment * y_vent(i_segment) + &
+               (1.0 - alfa_segment) * y_vent(i_segment - 1)
+
+       case (4, 7)
+          ! vent_flag = 4 or 7: initial lobes on multiple fissures
+          call random_number(alfa_polyline)
+          alfa_polyline = alfa_polyline * cum_fiss_length(n_vents)
+          idx_vent = 1
+          do while (cum_fiss_length(idx_vent) <= alfa_polyline)
+             idx_vent = idx_vent + 1
+          end do
+
+          num = alfa_polyline - cum_fiss_length(idx_vent - 1)
+          den = cum_fiss_length(idx_vent) - cum_fiss_length(idx_vent - 1)
+          alfa_segment = num / den
+
+          x_i = alfa_segment * x_vent_end(idx_vent - 1) + &
+               (1.0 - alfa_segment) * x_vent(idx_vent - 1)
+
+          y_i = alfa_segment * y_vent_end(idx_vent - 1) + &
+               (1.0 - alfa_segment) * y_vent(idx_vent - 1)
+
+       case (5)
+          ! vent_flag = 5: initial lobes on multiple fissures with equal
+          ! probability
+          call random_number(rand_val)
+          i_segment = int(rand_val * n_vents) + 1
+
+          call random_number(alfa_segment)
+
+          x_i = alfa_segment * x_vent_end(i_segment) + &
+               (1.0 - alfa_segment) * x_vent(i_segment)
+
+          y_i = alfa_segment * y_vent_end(i_segment) + &
+               (1.0 - alfa_segment) * y_vent(i_segment)
+
+       case (8)
+          ! vent_flag = 8: initial lobes chosen randomly with equal
+          ! probability
+          call random_number(alfa_vent)
+          alfa_vent = alfa_vent * cum_fiss_length(n_vents)
+          i_vent = 1
+          do while (cum_fiss_length(i_vent) <= alfa_vent)
+             i_vent = i_vent + 1
+          end do
+
+          x_i = x_vent(i_vent)
+          y_i = y_vent(i_vent)
+
+       end select
+
+    end if
+
+    ! WRITE(*,*) 'x_i,y_i ',x_i,y_i
+
+    RETURN
+
+  end subroutine first_lobe
+
+  subroutine step1A(x_i, y_i, max_slope_angle, slope)
+
+    USE parameters, ONLY : xcmin, ycmin
+
+    implicit none
+
+    ! Inputs
+    real(wp), intent(in) :: x_i, y_i
+
+    ! Outputs
+    real(wp), intent(out) :: max_slope_angle, slope
+
+    ! Local variables
+    integer :: ix, iy, ix1, iy1
+    real(wp) :: xi, yi, xi_fract, yi_fract
+    real(wp) :: Fx_test, Fy_test
+
+    ! Convert coordinates to grid indices
+    call coorToIdx(x_i, xcmin, inv_cell, ix, xi)
+    call coorToIdx(y_i, ycmin, inv_cell, iy, yi)
+
+    ! Calculate baricentric coordinates (fraction within the cell)
+    xi_fract = xi - real(ix)
+    yi_fract = yi - real(iy)
+
+    ix1 = ix+1
+    iy1 = iy+1
+
+    ! Interpolate slopes at the edges of the pixel
+    Fx_test = (yi_fract * (Ztot(iy1, ix1) - Ztot(iy1, ix)) +                    &
+         (1.0_wp - yi_fract) * (Ztot(iy, ix1) - Ztot(iy, ix))) * inv_cell
+
+    Fy_test = (xi_fract * (Ztot(iy1, ix1) - Ztot(iy, ix1)) +                    &
+         (1.0_wp - xi_fract) * (Ztot(iy1, ix) - Ztot(iy, ix))) * inv_cell
+
+    ! Calculate the maximum slope angle (in degrees)
+    max_slope_angle = mod(180.0_wp + atan2d(Fy_test, Fx_test), 360.0_wp)
+
+    ! Calculate the slope at the lobe center
+    slope = sqrt(Fx_test**2 + Fy_test**2)
+
+    ! WRITE(*,*) " max_slope_angle, slope ", max_slope_angle, slope
+
+  end subroutine step1A
+
+  subroutine compute_semiaxis(slope,new_x1, new_x2)
+
+    USE parameters, ONLY : pi
+    USE parameters, ONLY : lobe_area
+    USE parameters, ONLY : max_aspect_ratio, aspect_ratio_coeff
+
+
+    implicit none
+
+    ! Inputs
+    real(wp), intent(in) :: slope
+
+    ! Outputs
+    real(wp), intent(out) :: new_x1, new_x2
+
+    ! Local variables
+    real(wp) :: sqrt_aspect_ratio
+
+    REAL(wp) :: num
+
+    ! Compute the square root of aspect ratio
+    sqrt_aspect_ratio = sqrt(min(max_aspect_ratio, 1.0_wp + aspect_ratio_coeff * slope))
+
+    ! Compute the semi-axes of the elliptical lobe
+    num = sqrt(lobe_area / pi)
+    new_x1 = num * sqrt_aspect_ratio
+    new_x2 = num / sqrt_aspect_ratio
+
+    ! WRITE(*,*) "new_x1, new_x2 ",new_x1, new_x2
+
+    RETURN
+
+  end subroutine compute_semiaxis
+
+
+  subroutine coorToIdx(coor, minval, inv_step, idx, coor_norm)
+    implicit none
+
+    ! Inputs
+    real(wp), intent(in) :: coor, minval, inv_step
+
+    ! Outputs
+    integer, intent(out) :: idx
+    real(wp), intent(out) :: coor_norm
+
+    ! Calculate the normalized coordinate
+    coor_norm = (coor - minval) * inv_step
+
+    ! Calculate the index of the cell containing the point
+    idx = floor(coor_norm)+1
+
+    RETURN
+
+  end subroutine coorToIdx
+
+  subroutine bounding_box(xe, ye, i_West, i_East, j_South, j_North)
+
+    USE parameters, ONLY : nx, ny
+    USE parameters, ONLY : lx, ly
+
+    implicit none
+
+    ! Inputs
+    real(wp), dimension(:), intent(in) :: xe, ye
+
+    ! Outputs
+    integer, intent(out) :: i_West, i_East, j_South, j_North
+
+    ! Local variables
+    real(wp) :: min_xe, max_xe, min_ye, max_ye
+    real(wp) :: xi, yi
+    integer :: idx_west, idx_east, idx_south, idx_north
+
+    ! Find minimum and maximum x and y coordinates of the ellipse
+    min_xe = minval(xe)
+    max_xe = maxval(xe)
+    min_ye = minval(ye)
+    max_ye = maxval(ye)
+
+    ! WRITE(*,*) 'min_xe, max_xe, min_ye, max_ye',min_xe, max_xe, min_ye, max_ye
+    ! WRITE(*,*) 'lx, ly', lx, ly
+
+    ! Compute the bounding box indices for the grid
+    call coorToIdx(min_xe, lx, inv_cell, idx_west, xi)
+    i_West = max(1, min(nx, idx_west))
+
+    call coorToIdx(max_xe, lx, inv_cell, idx_east, xi)
+    i_East = max(1, min(nx, idx_east))
+
+    call coorToIdx(min_ye, ly, inv_cell, idx_south, yi)
+    j_South = max(1, min(ny, idx_south))
+
+    call coorToIdx(max_ye, ly, inv_cell, idx_north, yi)
+    j_North = max(1, min(ny, idx_north ))
+
+    ! WRITE(*,*) 'i_West, i_East, j_South, j_North',i_West, i_East, j_South, j_North
+    ! WRITE(*,*) Xtopo(j_South,i_West)-0.5_wp*cell, Xtopo(j_North,i_East)+0.5_wp*cell
+    ! WRITE(*,*) Ytopo(j_South,i_West)-0.5_wp*cell, Ytopo(j_North,i_East)+0.5_wp*cell
+    ! READ(*,*)
+
+  end subroutine bounding_box
+
+
+  subroutine ellipse(xc, yc, ax1, ax2, angle, xe, ye)
+
+    USE parameters, ONLY : X_circle, Y_circle
+    USE parameters, ONLY : npoints
+
+    implicit none
+
+    ! Input parameters
+    real(wp), intent(in) :: xc, yc    ! Center of the ellipse
+    real(wp), intent(in) :: ax1, ax2  ! Semi-axes of the ellipse
+    real(wp), intent(in) :: angle     ! Rotation angle in degrees
+
+    ! Output parameters
+    real(wp), intent(out) :: xe(npoints), ye(npoints) ! Ellipse coordinates
+
+    ! Local variables
+    real(wp) :: cos_angle, sin_angle
+    real(wp) :: X(npoints), Y(npoints)
+
+    ! Compute the sine and cosine of the angle
+    cos_angle = cosd(angle)
+    sin_angle = sind(angle)
+
+    X(1:npoints) = ax1 * X_circle(1:npoints)
+    Y(1:npoints) = ax2 * Y_circle(1:npoints)
+
+    xe(1:npoints) = xc + X(1:npoints) * cos_angle - Y(1:npoints) * sin_angle
+    ye(1:npoints) = yc + X(1:npoints) * sin_angle + Y(1:npoints) * cos_angle
+
+    RETURN
+
+  end subroutine ellipse
+
+
+  SUBROUTINE local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle,&
+       area_fract, nx_cell, ny_cell)
+
+    USE parameters, ONLY : nv2, inv_nv2
+
+    IMPLICIT NONE
+    ! Input parameters
+    REAL(wp), INTENT(in) :: Xc_local(:,:), Yc_local(:,:)
+    REAL(wp), INTENT(in) :: xc_e, yc_e, ax1, ax2, angle
+    INTEGER, INTENT(in) :: nx_cell, ny_cell
+
+    ! Output parameter
+    REAL(wp), INTENT(out) :: area_fract(max_cells,max_cells)
+
+    ! Local variables
+    REAL(wp) :: c, s, c1, s1, c2, s2
+    REAL(wp) :: Xc_local_1d(nx_cell*ny_cell), Yc_local_1d(nx_cell*ny_cell)
+    REAL(wp) :: c1xv_p_s1yv(nv2), c2yv_m_s2yv(nv2)
+
+    ! REAL(wp) :: term_tot(nx_cell*ny_cell, nv2)
+    REAL(wp) :: term_tot(nv2,nx_cell*ny_cell)
+
+    ! LOGICAL :: inside(nx_cell*ny_cell, nv2)
+    LOGICAL :: inside(nv2, nx_cell*ny_cell)
+
+    REAL(wp) :: area_fract_1d_temp(nx_cell*ny_cell)
+    REAL(wp) :: xv_temp(nv2) , yv_temp(nv2)
+    REAL(wp) :: xc_i , yc_i
+
+    INTEGER :: i
+    ! INTEGER :: j
+
+    ! Compute cosine and sine of the angle
+    c = cosd(angle)
+    s = sind(angle)
+
+    ! Compute coefficients
+    c1 = c / ax1
+    s1 = s / ax1
+    c2 = c / ax2
+    s2 = s / ax2
+
+    ! Translate xv and yv with respect to ellipse center
+    xv_temp = xv - xc_e
+    yv_temp = yv - yc_e
+
+    ! Flatten the Xc_local and Yc_local arrays
+    Xc_local_1d(1:nx_cell*ny_cell) = [Xc_local(1:ny_cell,1:nx_cell)]
+    Yc_local_1d(1:nx_cell*ny_cell) = [Yc_local(1:ny_cell,1:nx_cell)]
+
+    ! Compute c1*xv + s1*yv and c2*yv - s2*xv
+    c1xv_p_s1yv = c1 * xv_temp + s1 * yv_temp
+    c2yv_m_s2yv = c2 * yv_temp - s2 * xv_temp
+
+    DO i = 1, nx_cell*ny_cell
+
+       xc_i = Xc_local_1d(i)
+       yc_i = Yc_local_1d(i)
+
+       term_tot(:,i) = c1xv_p_s1yv(:) * (c1xv_p_s1yv(:) + 2.0_wp *              &
+            ( xc_i * c1 + yc_i * s1 ) ) + c2yv_m_s2yv(:) * ( c2yv_m_s2yv(:) +   &
+            2.0_wp * (  yc_i * c2 - xc_i * s2 ) ) +  (c1 * xc_i + s1 * yc_i)**2 &
+            + ( s2 * xc_i - c2 * yc_i )**2 
+
+    END DO
+
+    ! Determine which points are inside the ellipse
+    inside = (term_tot <= 1.0_wp)
+
+    ! Calculate the fraction of area covered by the ellipse
+    area_fract_1d_temp = SUM(MERGE(1, 0, inside), dim=1) * inv_nv2
+
+    area_fract(1:ny_cell,1:nx_cell) = RESHAPE(area_fract_1d_temp ,              &
+         [ny_cell, nx_cell])
+
+    ! Print the array with 2 decimal places
+    !do i = 1, ny_cell
+    !   do j = 1, nx_cell
+    !      if (j < nx_cell) then
+    !         write(*,'(F6.2, 1X)', advance='no') area_fract(i, j)
+    !      else
+    !         write(*,'(F6.2)', advance='no') area_fract(i, j)
+    !      end if
+    !   end do
+    !   write(*,*) ! Newline after each row
+    !end do
+    !write(*,*)
+
+    RETURN
+
+  end subroutine local_intersection
+
+
+  SUBROUTINE rasterize(x_i, y_i, x1_i, x2_i, angle_i, dist_int_i, i_West,       &
+       i_East, j_South, j_North, Zflow_local, Dist_local, Zflow_local_int)
+
+    USE parameters, only : Xtopo, Ytopo
+    USE parameters, only : npoints
+
+    IMPLICIT NONE
+
+    ! Input parameters
+    REAL(wp), INTENT(in) :: x_i, y_i, x1_i, x2_i, angle_i
+    INTEGER, INTENT(in) :: dist_int_i
+
+    ! Output parameters
+    INTEGER, INTENT(out) :: i_West, i_East, j_South, j_North
+    REAL(wp),INTENT(out) :: Zflow_local(max_cells,max_cells)
+    INTEGER, INTENT(out) :: Dist_local(max_cells,max_cells)
+    INTEGER, INTENT(out) :: Zflow_local_int(max_cells,max_cells)
+
+    ! Local variables
+    REAL(wp) :: xe(npoints), ye(npoints)
+    INTEGER :: nx_local, ny_local
+
+    ! Compute the points of the lobe
+    CALL ellipse(x_i, y_i, x1_i, x2_i, angle_i, xe, ye)
+
+    ! Compute the bounding box for the new lobe
+    CALL bounding_box(xe, ye, i_West, i_East, j_South, j_North)
+
+    ! Define the subgrid of pixels to check for coverage
+    nx_local = i_East - i_West + 1
+    ny_local = j_North - j_South + 1
+
+    ! Compute the fraction of cells covered by the lobe
+    CALL local_intersection( Xtopo(j_South:j_North, i_West:i_East),             &
+         Ytopo(j_South:j_North, i_West:i_East), x_i, y_i, x1_i, x2_i,           &
+         angle_i, Zflow_local, nx_local, ny_local)
+
+    ! Compute the integer version (0 = pixel not covered by lobe, 1 = covered)
+    Zflow_local_int(1:ny_local,1:nx_local) =                                    &
+         ceiling(Zflow_local(1:ny_local,1:nx_local))
+
+    ! Compute the new minimum "lobe distance" of the pixels from the vent
+    Dist_local(1:ny_local,1:nx_local) =                                         &
+         MERGE(dist_int_i, 9999, Zflow_local_int == 1)
+
+    RETURN
+
+  END SUBROUTINE rasterize
+
+  subroutine step0(i, distInt, idx)
+
+    USE parameters, ONLY : lobe_exponent
+    USE parameters, ONLY : force_max_length, start_from_dist_flag
+    USE parameters, ONLY : max_length
+
+    implicit none
+    integer, intent(in) :: i
+    integer, intent(in) :: distInt(i)
+    integer, intent(out) :: idx
+
+    real(wp) :: idx0, idx1, idx2
+    integer :: idx3, sorted_dist(i)
+    integer :: mask(i)
+
+    ! Generate a random number between 0 and 1
+    call random_number(idx0)
+
+    idx1 = idx0**lobe_exponent
+
+    if (force_max_length) then
+       ! The parent lobe is chosen only among those with dist smaller than
+       ! max_length
+
+       mask = merge(1, 0,distInt < max_length)
+       ! mask = distInt < max_length
+       idx2 = sum(mask) * idx1
+       idx3 = floor(idx2)
+       idx = int(idx3)
+
+       ! Sort distInt and find corresponding index
+       call argsort(distInt, sorted_dist)
+       idx = sorted_dist(idx)
+    else
+       ! The parent lobe is chosen among all the lobes
+       idx2 = i * idx1
+       idx = int(floor(idx2))
+    end if
+
+    if (start_from_dist_flag) then
+       ! The probability law is associated with the distance from the vent
+       call argsort(distInt, sorted_dist)
+       idx = sorted_dist(idx)
+    end if
+
+    RETURN
+
+  end subroutine step0
+
+  subroutine step1(xi, ix, yi, iy, x_idx, y_idx, ax1, ax2, angle, slope,        &
+       max_slope_angle, zidx)
+
+    USE parameters, ONLY : xcmin, ycmin
+    USE parameters, ONLY : npoints
+
+    implicit none
+    ! Input variables
+    real(wp), intent(in) :: xi, yi, x_idx, y_idx
+    integer, intent(in) :: ix, iy
+    real(wp), intent(in) :: ax1, ax2, angle
+
+    ! Output variables
+    real(wp), intent(out) :: slope, max_slope_angle, zidx
+
+    ! Local variables
+    integer :: ix1, iy1, idx_min, i
+    real(wp) :: xi_fract, yi_fract
+    real(wp) :: xe(npoints), ye(npoints), ze(npoints)
+    !real(wp) :: xei(npoints), yei(npoints)
+    !integer :: ixe(npoints), iye(npoints), ixe1(npoints), iye1(npoints)
+    !real(wp) :: xei_fract(npoints), yei_fract(npoints)
+
+    real(wp) :: xei, yei
+    integer :: ixe, iye, ixe1, iye1
+    real(wp) :: xei_fract, yei_fract
+
+    real(wp) :: Fx_lobe, Fy_lobe
+
+    ! Incremented indices
+    ix1 = ix + 1
+    iy1 = iy + 1
+
+    ! Compute the baricentric coordinates of the lobe center in the pixel
+    xi_fract = xi - ix
+    yi_fract = yi - iy
+
+    ! Interpolate the elevation at the corners of the pixel to find the
+    ! elevation at the lobe center
+    zidx = xi_fract * (yi_fract*Ztot(ix1, iy1) + (1.0-yi_fract) *               &
+         Ztot(ix1, iy)) + (1.0-xi_fract) * (yi_fract*Ztot(ix, iy1) +            &
+         (1.0-yi_fract) * Ztot(ix, iy))
+
+    ! Compute the points of the lobe
+    call ellipse(x_idx, y_idx, ax1, ax2, angle, xe, ye)
+
+    ! Interpolate the grid values to find the elevation at the ellipse points
+    DO i = 1, npoints
+
+       ! Compute the indices of the pixels containing the ellipse points
+       xei = (xe(i) - xcmin) * inv_cell
+       yei = (ye(i) - ycmin) * inv_cell
+
+       ixe = floor(xei)
+       iye = floor(yei)
+
+       ! Compute the local coordinates of the points within the pixels containing
+       ! them
+       xei_fract = xei - ixe
+       yei_fract = yei - iye
+
+       ixe1 = ixe + 1
+       iye1 = iye + 1
+
+       ze(i) = xei_fract * (yei_fract * Ztot(ixe1, iye1) +                      &
+            (1.0_wp - yei_fract) * Ztot(ixe1, iye)) +                           &
+            (1.0_wp - xei_fract) * (yei_fract * Ztot(ixe, iye1) +               &
+            (1.0_wp - yei_fract) * Ztot(ixe, iye))
+
+    END DO
+
+    ! Find the point on the ellipse with minimum elevation
+    idx_min = minloc(ze,DIM=1)
+
+    ! Compute the vector from the center of the lobe to the point of minimum
+    ! elevation on the boundary
+    Fx_lobe = x_idx - xe(idx_min)
+    Fy_lobe = y_idx - ye(idx_min)
+
+    ! Compute the slope and the angle
+    slope = max(0.0_wp, (zidx - ze(idx_min)) / sqrt(Fx_lobe**2 + Fy_lobe**2))
+    max_slope_angle = mod(180.0_wp + atan2d(Fy_lobe, Fx_lobe), 360.0_wp)
+
+    RETURN
+
+  end subroutine step1
+
+  subroutine step2(slope, max_slope_angle, new_angle)
+
+    USE parameters, ONLY : max_slope_prob
+    USE parameters, ONLY : pi
+    implicit none
+
+    ! Inputs
+    real(wp), intent(in) :: slope, max_slope_angle
+
+    ! Outputs
+    real(wp), intent(out) :: new_angle
+
+    ! Local variables
+    real(wp) :: slopedeg, sigma, rand, rand_angle_new
+    logical :: check_flag
+
+    ! Default to the unperturbed angle
+    new_angle = max_slope_angle
+
+    IF (max_slope_prob < 1.0_wp) THEN
+
+       ! Convert slope to degrees
+       slopedeg = atand(slope)
+
+       IF (slopedeg > 0.0_wp .and. max_slope_prob > 0.0_wp) THEN
+
+          sigma = (1.0_wp-max_slope_prob) / max_slope_prob * (90.0_wp-slopedeg) &
+               / slopedeg
+
+          check_flag = .TRUE.
+          DO WHILE (check_flag)
+
+             ! Generate a random normal value
+             CALL random_number(rand)
+             rand_angle_new = sigma * sqrt(-2.0_wp * log(rand)) *               &
+                  cos(2.0_wp * pi * rand)
+
+             ! Check if the angle is within bounds
+             IF (-180.0_wp<=rand_angle_new .AND. rand_angle_new<=180.0_wp) THEN
+
+                check_flag = .FALSE.
+
+             END IF
+
+          END DO
+
+       ELSE
+
+          ! Generate a uniform random value
+          CALL random_number(rand)
+          rand_angle_new = 360.0_wp * ABS(rand - 0.5_wp)
+
+       END IF
+
+       ! Compute the new angle
+       new_angle = max_slope_angle + rand_angle_new
+
+    END IF
+
+    ! WRITE(*,*) 'new_angle ',new_angle
+
+    RETURN
+
+  end subroutine step2
+
+
+  subroutine step3(angle_idx,  old_angle, slope, cos_angle1, sin_angle1,        &
+       new_angle)
+
+    USE parameters, ONLY : inertial_exponent
+    USE parameters, ONLY : pi
+
+    implicit none
+    ! Input variables
+    real(wp), intent(in) :: angle_idx,  old_angle, slope
+
+    ! Output variables
+    real(wp), intent(out) :: cos_angle1, sin_angle1, new_angle
+
+    ! Local variables
+    real(wp) :: cos_angle2, sin_angle2, alfa_inertial, x_avg, y_avg, angle_avg
+
+    ! STEP 3: ADD THE EFFECT OF INERTIA
+    ! Cosine and sine of the angle of the parent lobe
+    cos_angle1 = cosd(angle_idx)
+    sin_angle1 = sind(angle_idx)
+
+    ! Cosine and sine of the angle of maximum slope
+    cos_angle2 = cosd(old_angle)
+    sin_angle2 = sind(old_angle)
+
+    if (inertial_exponent == 0.0_wp) then
+
+       alfa_inertial = 0.0_wp
+
+    else
+
+       alfa_inertial = (1.0_wp - (2.0_wp * atan(slope)/pi)**inertial_exponent)  &
+            **(1.0_wp / inertial_exponent)
+
+    end if
+
+    ! Average angles using inertia effect
+    x_avg = (1.0_wp - alfa_inertial) * cos_angle2 + alfa_inertial * cos_angle1
+    y_avg = (1.0_wp - alfa_inertial) * sin_angle2 + alfa_inertial * sin_angle1
+
+    ! Calculate the new angle
+    angle_avg = mod( atan2d(y_avg, x_avg), 360.0_wp)
+    new_angle = angle_avg
+
+  end subroutine step3
+
+  subroutine step4and5(new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,      &
+       zidx, cos_angle1, sin_angle1, check_step, x_new, y_new, new_x1, new_x2,  &
+       new_angle_out)
+
+    USE parameters, ONLY : dist_fact
+    USE parameters, ONLY : xcmin, ycmin, nx, ny
+
+    implicit none
+
+    ! Input variables
+    REAL(wp), INTENT(IN) :: new_angle, angle_idx, x1_idx, x2_idx
+    REAL(wp), INTENT(IN) :: x_idx, y_idx, zidx
+    REAL(wp), INTENT(IN) :: cos_angle1, sin_angle1
+
+    ! Output variables
+    LOGICAL, INTENT(out) :: check_step
+    real(wp), INTENT(out) :: x_new, y_new, new_x1, new_x2, new_angle_out
+
+    ! Local variables
+    REAL(wp) :: a, xt, yt, delta_x, delta_y, xi, yi
+    REAL(wp) :: xi_fract, yi_fract, ze, slope
+    INTEGER :: ix, iy, ix1, iy1
+    REAL(wp) :: v1, v2, v
+    REAL(wp) :: x1_2 , x2_2
+
+    ! Calculate the angular coefficient 'a' of the line
+    a = tand(new_angle - angle_idx)
+
+    x1_2 = x1_idx**2
+    x2_2 = x2_idx**2
+
+    ! Calculate xt based on the direction of the new lobe
+    IF (cosd(new_angle - angle_idx) > 0.0_wp) THEN
+
+       xt = SQRT(x1_2 * x2_2 / (x2_2 + x1_2 * a**2))
+
+    ELSE
+
+       xt = -SQRT(x1_2 * x2_2 / (x2_2 + x1_2 * a**2))
+
+    END IF
+
+    ! Calculate yt
+    yt = a * xt
+
+    ! Calculate delta_x and delta_y based on rotation
+    delta_x = xt * cos_angle1 - yt * sin_angle1
+    delta_y = xt * sin_angle1 + yt * cos_angle1
+
+    ! Convert coordinates to index values
+    CALL coorToIdx(x_idx + delta_x, xcmin, inv_cell, ix, xi)
+    CALL coorToIdx(y_idx + delta_y, ycmin, inv_cell, iy, yi)
+
+    ix1 = ix + 1
+    iy1 = iy + 1
+
+    ! Check stopping condition (lobe close to domain boundary)
+    if (ix <= 0.5_wp * max_cells .or. ix1 >= nx - 0.5_wp * max_cells .or.       &
+         iy <= 0.5_wp * max_cells .or. iy1 >= ny - 0.5_wp * max_cells) then
+
+       check_step = .FALSE.
+       x_new = 0.0_wp
+       y_new = 0.0_wp
+       new_x1 = 0.0_wp
+       new_x2 = 0.0_wp
+       new_angle_out = 0.0_wp
+
+    else
+
+       check_step = .TRUE.  ! default value when no stopping condition is met
+
+       xi_fract = xi - ix
+       yi_fract = yi - iy
+
+       ! Interpolate Ztot at the new budding point
+       ze = xi_fract * (yi_fract * Ztot(iy1, ix1) +                             &
+            (1.0_wp - yi_fract) * Ztot(iy, ix1)) +                              &
+            (1.0_wp - xi_fract) * (yi_fract * Ztot(iy1, ix) +                   &
+            (1.0_wp - yi_fract) * Ztot(iy, ix))
+
+       ! Calculate the slope
+       slope = max(0.0_wp, (zidx - ze) / sqrt(delta_x**2 + delta_y**2))
+
+       ! Compute the semi-axes of the new lobe
+       CALL compute_semiaxis(slope,new_x1, new_x2)
+
+       ! Calculate v1 and v2
+       v1 = sqrt(delta_x**2 + delta_y**2)
+       v2 = v1 + new_x1
+
+       ! Calculate v
+       v = (v1 * (1.0_wp - dist_fact) + v2 * dist_fact) / v1
+
+       ! Compute the new lobe center coordinates
+       x_new = x_idx + v * delta_x
+       y_new = y_idx + v * delta_y
+       new_angle_out = new_angle
+
+    end if
+
+    RETURN
+
+  end subroutine step4and5
+
+
+  ! Helper subroutine for sorting an array and returning indices
+  subroutine argsort(array, sorted_indices)
+    implicit none
+    integer, intent(in) :: array(:)
+    integer, intent(out) :: sorted_indices(size(array))
+    integer :: i, j, n
+    integer :: temp_idx
+
+    n = size(array)
+    do i = 1, n
+       sorted_indices(i) = i
+    end do
+
+    ! Simple bubble sort for demonstration; replace with more efficient
+    ! algorithm if needed
+    do i = 1, n-1
+       do j = i+1, n
+          if (array(sorted_indices(i)) > array(sorted_indices(j))) then
+             temp_idx = sorted_indices(i)
+             sorted_indices(i) = sorted_indices(j)
+             sorted_indices(j) = temp_idx
+          end if
+       end do
+    end do
+  end subroutine argsort
+
+END MODULE flow

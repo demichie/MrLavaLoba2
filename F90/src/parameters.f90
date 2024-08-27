@@ -1,0 +1,175 @@
+!********************************************************************************
+!> \brief Parameters
+!
+!> This module contains the parameters for numerical solution of the
+!> model.
+!********************************************************************************
+MODULE parameters
+  
+  IMPLICIT NONE
+  
+  INTEGER, PARAMETER :: sp = kind(1.0)
+  INTEGER, PARAMETER :: dp = kind(1.0d0)
+  
+  !> working precision
+  INTEGER, PARAMETER :: wp = dp
+  
+  CHARACTER(LEN=40) :: run_name
+  CHARACTER(LEN=40) :: source
+
+  INTEGER :: n_restarts
+  CHARACTER(LEN = 40), ALLOCATABLE :: restart_files(:)
+
+  !> Integer for the vent:
+  !> - 0      => the initial lobes are on the vents
+  !>             coordinates and the flows start initially
+  !>             from the first vent, then from the second
+  !>             and so on.
+  !> - 1      => the initial lobes are chosen randomly from
+  !>             the vents coordinates and each vent has the
+  !>             same probability
+  !> .
+  INTEGER :: vent_flag
+  
+  !> Flag to crop the DEM
+  !> - T      => crop
+  !> - F      => no crop
+  !> .
+  LOGICAL :: crop_flag
+  
+  !> Flag to save the hazard file
+  !> - T      => save hazard file
+  !> - F      => no save
+  !> .
+  LOGICAL :: hazard_flag
+  
+  !> Flag to read the volume from input file
+  !> - T      => read total_volume
+  !> - F      => no read
+  !> .
+  LOGICAL :: volume_flag
+  
+  !> Flag to keep the area of lobes constant
+  !> - T      => prescribed area, compute thickness 
+  !> - F      => prescribed thickness, compute area
+  !> .
+  LOGICAL :: fixed_dimension_flag
+  
+  !> Flag to modify the topography
+  !> - T      => emplaced flow modify the topography
+  !> - F      => no modification
+  !> .
+  LOGICAL :: topo_mod_flag
+
+  !> Flag to restart form previous files
+  !> - T      => restart
+  !> - F      => no restart
+  !> .
+  LOGICAL :: restart_flag
+
+  INTEGER :: n_vents
+  REAL(wp), ALLOCATABLE :: x_vent(:)
+  REAL(wp), ALLOCATABLE :: y_vent(:)
+
+  REAL(wp) :: east_to_vent, west_to_vent, south_to_vent, north_to_vent
+
+  INTEGER :: n_flows, min_n_lobes, max_n_lobes
+
+  REAL(wp) :: total_volume
+  
+  REAL(wp) :: lobe_area
+  REAL(wp) :: avg_lobe_thickness
+  REAL(wp) :: thickness_ratio
+  REAL(wp) :: lobe_exponent
+  REAL(wp) :: max_slope_prob
+  REAL(wp) :: inertial_exponent
+
+  REAL(wp) :: thickening_parameter
+  REAL(wp), ALLOCATABLE :: filling_parameter(:,:)
+
+  REAL(wp), ALLOCATABLE :: restart_filling_parameters(:)
+  
+  INTEGER :: n_init
+
+  REAL(wp) :: dist_fact
+  REAL(wp) :: aspect_ratio_coeff
+  REAL(wp) :: max_aspect_ratio
+
+  REAL(wp) :: a_beta, b_beta
+  
+  INTEGER :: npoints
+  INTEGER :: nv , nv2
+  REAL(wp) :: inv_nv2
+
+  INTEGER :: nx
+  INTEGER :: ny
+  REAL(wp) :: lx
+  REAL(wp) :: ly
+  REAL(wp) :: cell
+  REAL(wp) :: nd
+
+  !> Topography elevation 
+  REAL(wp), ALLOCATABLE :: Ztopo(:,:)
+
+  REAL(wp), ALLOCATABLE :: Xtopo(:,:)
+  REAL(wp), ALLOCATABLE :: Ytopo(:,:)
+  
+
+  INTEGER ::  iW, iE, jS, jN
+
+  REAL(wp) :: xcmin, xcmax, ycmin, ycmax
+
+  REAL(wp) :: pi
+  REAL(wp) :: deg2rad
+  REAL(wp) :: rad2deg
+
+  REAL(wp), ALLOCATABLE :: X_circle(:)
+  REAL(wp), ALLOCATABLE :: Y_circle(:)
+
+  REAL(wp), ALLOCATABLE :: fissure_probabilities(:)
+
+  LOGICAL :: force_max_length
+  LOGICAL :: start_from_dist_flag
+  INTEGER :: max_length
+
+  REAL(wp), ALLOCATABLE :: masking_threshold(:)
+  INTEGER :: n_masking
+  
+  
+CONTAINS
+
+  SUBROUTINE init_run
+
+    IMPLICIT NONE
+
+    REAL(wp), ALLOCATABLE :: t(:)
+    REAL(wp) :: dt
+
+    INTEGER :: i
+
+    pi = 4.0_wp * ATAN(1.0_wp)
+    deg2rad = pi / 180.0_wp
+    rad2deg = 180.0_wp / pi
+
+    ! Allocate arrays
+    allocate(t(npoints))
+    allocate(X_circle(npoints))
+    allocate(Y_circle(npoints))
+    
+    ! Compute the step size
+    dt = 2.0_wp * pi / (npoints - 1)
+    
+    ! Generate the values for t
+    do i = 1, npoints
+       t(i) = (i - 1) * dt
+    end do
+    
+    ! Compute X_circle and Y_circle
+    X_circle = cos(t)
+    Y_circle = sin(t)
+
+  END SUBROUTINE init_run
+  
+   
+END MODULE parameters
+

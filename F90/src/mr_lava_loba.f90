@@ -1,0 +1,65 @@
+PROGRAM mr_lava_loba
+
+  USE inpout, ONLY : run_name
+  USE parameters, ONLY : wp
+  USE parameters, ONLY : lx, ly, cell
+  USE flow
+
+  USE flow, ONLY : allocate_flow, init_fissure, flow_loop
+  USE inpout, ONLY : init_param, read_param, read_topo, write_asc
+  USE inpout, ONLY : write_masking
+  USE parameters, ONLY : init_run
+  
+  IMPLICIT NONE
+
+  CHARACTER*40 :: output_file
+  REAL(wp) :: t2 , t3
+  INTEGER :: st2 , st3 , cr , cm
+  REAL(wp) :: rate
+
+  ! First initialize the system_clock
+  CALL system_clock(count_rate=cr)
+  CALL system_clock(count_max=cm)
+  rate = cr
+
+  WRITE(*,*)
+  WRITE(*,*) "Mr Lava Loba by M.de' Michieli Vitturi and S.Tarquini"
+  WRITE(*,*)
+
+  CALL init_param
+
+  CALL read_param
+
+  CALL read_topo
+
+  CALL init_run
+
+  CALL init_fissure
+
+  CALL allocate_flow
+
+  WRITE(*,*) 'End pre-processing'
+  WRITE(*,*)
+
+  CALL cpu_time(t2)
+  CALL system_clock(st2)
+  
+  CALL flow_loop
+
+  CALL cpu_time(t3)
+  CALL system_clock(st3)
+
+  
+  WRITE(*,*) 'Time taken by flow loop is',t3-t2,'seconds'
+  WRITE(*,*) 'Elapsed real time = ', DBLE( st3 - st2 ) / rate,'seconds'
+
+  
+  output_file = trim(run_name) // '_thickness_full' // '.asc'  
+  CALL write_asc(Zflow, output_file, lx, ly, cell, 0.0_wp)
+
+  CALL write_masking
+  
+END PROGRAM mr_lava_loba
+
+
+  
