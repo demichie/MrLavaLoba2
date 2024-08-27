@@ -242,11 +242,13 @@ CONTAINS
           
           ! Fixed dimension flag logic
           if (fixed_dimension_flag ) then
-             avg_lobe_thickness = total_volume / (n_flows * lobe_area * 0.5 * (min_n_lobes + max_n_lobes))
+             avg_lobe_thickness = total_volume / (n_flows * lobe_area * 0.5     &
+                  * (min_n_lobes + max_n_lobes))
              print *, "Average Lobe thickness = ", avg_lobe_thickness, " m"
              
           else
-             lobe_area = total_volume / (n_flows * avg_lobe_thickness * 0.5 * (min_n_lobes + max_n_lobes))
+             lobe_area = total_volume / (n_flows * avg_lobe_thickness * 0.5     &
+                  * (min_n_lobes + max_n_lobes))
              print *, "Lobe area = ", lobe_area, " m2"
              
           end if
@@ -432,11 +434,21 @@ CONTAINS
     allocate(xc_temp(cols))
     allocate(yc_temp(rows))    
 
+    WRITE(*,*)
+    WRITE(*,*) 'Reading DEM file:',TRIM(source)
     do i = 1, rows
-       read(topo_unit, *) arr_temp(ny-i+1, :)
-    end do
-    close(topo_unit)    
 
+       WRITE(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") ACHAR(13),              &
+            & " Percent Complete: " ,                                        &
+            ( REAL(i) / REAL(rows))*100.0, "%"
+             
+       read(topo_unit, *) arr_temp(rows-i+1, :)
+       
+    end do
+
+    WRITE(*,*)
+    
+    close(topo_unit)    
 
     IF ( crop_flag) THEN
 
@@ -453,14 +465,15 @@ CONTAINS
        yS = MINVAL(y_vent) - south_to_vent
        yN = MAXVAL(y_vent) + north_to_vent
 
+       WRITE(*,*) 'Cropping of original DEM'
+       WRITE(*,*) 'xW,xE,yS,yN', xW, xE, yS, yN
+
        ! crop the DEM to the desired domain
        iW = MAX(1, (floor((xW - lx) / cell)) )
        iE = MIN(cols, (ceiling((xE - lx) / cell)) )
        jS = MAX(1, (floor((yS - ly) / cell)) )
        jN = MIN(rows, (ceiling((yN - ly) / cell)) )
 
-       WRITE(*,*) 'Cropping of original DEM'
-       WRITE(*,*) 'xW,xE,yS,yN', xW, xE, yS, yN
        WRITE(*,*) 'iW,iE,jS,jN', iW, iE, jS, jN
        WRITE(*,*)
 
@@ -617,50 +630,56 @@ CONTAINS
 
     IMPLICIT NONE
 
-    INTEGER :: i_thr, i
+    INTEGER :: i_thr, i , k
     INTEGER :: max_lobes
-    REAL(wp) :: masked_Zflow(size(Zflow, 1), size(Zflow, 2))
-    REAL(wp) :: total_Zflow
+    ! REAL(wp) :: masked_Zflow(ny,nx)
+    INTEGER :: check_term1D(nx)
+    REAL(wp) :: total_Zflow, total_masked_Zflow
     REAL(wp) :: threshold
     REAL(wp) :: volume_fraction
     CHARACTER(LEN=40) :: masked_file, masking_str1, masking_str2
-    
-    DO i_thr = 1,n_masking
 
-       max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
+    max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
+
+    ! Sum the values in Zflow
+    total_Zflow = sum(Zflow)
+
+    DO i_thr = 1,n_masking
 
        DO i = 1,10*max_lobes
 
           threshold = i * 0.1_wp * avg_lobe_thickness
 
-          !WRITE(*,*) 'threshold',threshold 
+          total_masked_Zflow = 0.0_wp
 
-          masked_Zflow = merge(Zflow, 0.0_wp, Zflow >= threshold)
+          DO k = 1,ny
 
-          ! Sum the values in Zflow
-          total_Zflow = sum(Zflow)
+             ! 0-1 mask for flow
+             check_term1D = Zflow(k,1:nx) .GT. threshold
 
-          volume_fraction = sum(masked_Zflow) / total_Zflow
+             total_masked_Zflow = total_masked_Zflow +       &
+                  sum(check_term1D*Zflow(k,1:nx))
+             
+          END DO
 
-          !WRITE(*,*) 'volume_fraction',volume_fraction
-          !READ(*,*)
+          volume_fraction = total_masked_Zflow / total_Zflow
 
           IF (volume_fraction < masking_threshold(i_thr)) THEN
 
              WRITE(*,*)
              WRITE(*,*) 'Masking threshold', masking_threshold(i_thr)
-             WRITE(*,*) 'Total volume', cell**2 * total_Zflow,                  &
-                  ' m3 Masked volume', cell**2 * sum(masked_Zflow),             &
-                  ' m3 Volume fraction', volume_fraction
+             WRITE(*,*) 'Total volume (m3) =', cell**2 * total_Zflow,                  &
+                  'Masked volume (m3) =', cell**2 * total_masked_Zflow,            &
+                  'Volume fraction =', volume_fraction
              
-             WRITE(*,*) 'Total area', cell**2 * sum(merge(0,1,Zflow > 0)),      &
-                  ' m2 Masked area',cell**2 * sum(merge(0,1,masked_Zflow > 0)), &
-                  ' m2'
+             !WRITE(*,*) 'Total area', cell**2 * sum(merge(0,1,Zflow > 0)),      &
+             !     ' m2 Masked area',cell**2 * sum(merge(0,1,masked_Zflow > 0)), &
+             !     ' m2'
              
-             WRITE(*,*) 'Average thickness full',                               &
-                  total_Zflow / sum(merge(0,1,Zflow > 0)),                      &
-                  ' m Average thickness mask', sum(masked_Zflow) /              &
-                  sum(merge(0,1,masked_Zflow > 0)), ' m'
+             !WRITE(*,*) 'Average thickness full',                               &
+             !     total_Zflow / sum(merge(0,1,Zflow > 0)),                      &
+             !     ' m Average thickness mask', sum(masked_Zflow) /              &
+             !     sum(merge(0,1,masked_Zflow > 0)), ' m'
 
              ! Convert the masking_threshold value to a string and replace '.' with '_'
              write(masking_str1, '(F6.2)') masking_threshold(i_thr)
@@ -670,7 +689,7 @@ CONTAINS
              ! Concatenate the strings
              masked_file = trim(run_name) // '_thickness_masked_' // trim(masking_str2) // '.asc'
              
-             CALL write_asc(masked_Zflow, masked_file, lx, ly, cell, 0.0_wp)
+             CALL write_asc(Zflow, masked_file, lx, ly, cell, 0.0_wp, masking_threshold(i_thr))
              
              EXIT
              
@@ -683,7 +702,7 @@ CONTAINS
   END SUBROUTINE write_masking
   
 
-  SUBROUTINE write_asc(out_array, output_file, x0, y0, cell_size, nodata)
+  SUBROUTINE write_asc(out_array, output_file, x0, y0, cell_size, nodata, threshold)
 
     IMPLICIT NONE
 
@@ -692,8 +711,11 @@ CONTAINS
     REAL(wp), INTENT(IN) :: x0, y0
     REAL(wp), INTENT(IN) :: cell_size
     REAL(wp), INTENT(IN) :: nodata
+    REAL(wp), INTENT(IN) :: threshold
 
-
+    INTEGER :: check_term1D(size(out_array,2))
+    REAL(wp) ::out_array1D(size(out_array,2))
+    
     INTEGER :: out_cells_x, out_cells_y
     INTEGER :: j
 
@@ -711,7 +733,11 @@ CONTAINS
 
     DO j = out_cells_y,1,-1
 
-       WRITE(output_unit,'(2000ES12.3E3)') out_array(j,1:out_cells_x)
+       check_term1D = out_array(j,1:out_cells_x) .GT. threshold
+       out_array1D = check_term1D * out_array(j,1:out_cells_x)
+       WRITE(output_unit,'(2000ES12.3E3)') out_array1D
+       
+       ! WRITE(output_unit,'(2000ES12.3E3)') out_array(j,1:out_cells_x)
 
     ENDDO
 

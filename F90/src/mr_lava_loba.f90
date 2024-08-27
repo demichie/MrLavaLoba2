@@ -55,7 +55,7 @@ PROGRAM mr_lava_loba
 
   
   output_file = trim(run_name) // '_thickness_full' // '.asc'  
-  CALL write_asc(Zflow, output_file, lx, ly, cell, 0.0_wp)
+  CALL write_asc(Zflow, output_file, lx, ly, cell, 0.0_wp, 0.0_wp)
 
   CALL write_masking
   

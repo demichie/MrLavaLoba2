@@ -225,12 +225,13 @@ CONTAINS
     REAL(wp) :: new_angle
 
     LOGICAL :: check_step
-
+    
 
     Ztot(1:ny,1:nx) = Ztopo(1:ny,1:nx)
     Zflow(1:ny,1:nx) = 0.0_wp
-
     n_lobes_tot = 0
+
+    WRITE(*,*) 'Computing flow'
 
     DO i_flow = 1,n_flows
 
@@ -279,7 +280,7 @@ CONTAINS
        ! Print the results (optional)
        !print *, 'Minimum Lobe Thickness:', thickness_min
        !print *, 'Delta Lobe Thickness:', delta_lobe_thickness
-
+       
        DO i = 1,n_init
 
           IF (n_flows==1) THEN
