@@ -353,7 +353,7 @@ CONTAINS
 
        READ(input_unit,*) masking_threshold(i) 
 
-       WRITE(*,*) i , masking_threshold(i)  
+       WRITE(*,'(I4,1X, F6.3)') i , masking_threshold(i)  
 
     END DO
 
@@ -434,7 +434,6 @@ CONTAINS
     allocate(xc_temp(cols))
     allocate(yc_temp(rows))    
 
-    WRITE(*,*)
     WRITE(*,*) 'Reading DEM file:',TRIM(source)
     do i = 1, rows
 
@@ -447,6 +446,8 @@ CONTAINS
     end do
 
     WRITE(*,*)
+    WRITE(*,*)
+    
     
     close(topo_unit)    
 
@@ -466,7 +467,7 @@ CONTAINS
        yN = MAXVAL(y_vent) + north_to_vent
 
        WRITE(*,*) 'Cropping of original DEM'
-       WRITE(*,*) 'xW,xE,yS,yN', xW, xE, yS, yN
+       WRITE(*,'(A, 4(F10.1, 1X))') ' xW,xE,yS,yN', xW, xE, yS, yN
 
        ! crop the DEM to the desired domain
        iW = MAX(1, (floor((xW - lx) / cell)) )
