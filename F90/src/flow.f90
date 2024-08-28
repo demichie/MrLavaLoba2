@@ -107,20 +107,14 @@ CONTAINS
 
     else
 
-       ! This would be a manual calculation or a call to a Fortran beta distribution function.
-       ! For simplicity, let's assume x_beta and beta_pdf have been calculated similarly as in Python.
-       ! Here we should manually calculate the values, for now using placeholder values.
-
        ! Calculate x_beta (equivalent to np.rint(range(0, n_flows)) / (n_flows - 1))
        do i = 1, n_flows
           x_beta(i) = real(i - 1) / real(n_flows - 1)
+          beta_pdf(i) = BetaPDF(x_beta(i),a_beta,b_beta)
        end do
 
-       ! Calculate beta_pdf (you might need to implement or use a library for this)
-       ! Assuming placeholder beta_pdf values for this translation
-       beta_pdf = [0.1, 0.3, 0.5, 0.7, 0.9]
-
-       alloc_n_lobes = int(min_n_lobes + 0.5 * (max_n_lobes - min_n_lobes) * maxval(beta_pdf))
+       alloc_n_lobes = int(min_n_lobes + 0.5 * (max_n_lobes - min_n_lobes)  &
+            * maxval(beta_pdf))
 
        ! print *, 'Flow with the maximum number of lobes', maxloc(beta_pdf)
 
@@ -225,7 +219,7 @@ CONTAINS
     REAL(wp) :: new_angle
 
     LOGICAL :: check_step
-    
+
 
     Ztot(1:ny,1:nx) = Ztopo(1:ny,1:nx)
     Zflow(1:ny,1:nx) = 0.0_wp
@@ -280,7 +274,7 @@ CONTAINS
        ! Print the results (optional)
        !print *, 'Minimum Lobe Thickness:', thickness_min
        !print *, 'Delta Lobe Thickness:', delta_lobe_thickness
-       
+
        DO i = 1,n_init
 
           IF (n_flows==1) THEN
@@ -1230,7 +1224,7 @@ CONTAINS
     new_angle = modulo( atan2d(y_avg, x_avg), 360.0_wp)
 
     RETURN
-    
+
   end subroutine step3
 
   subroutine step4and5(new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,      &
@@ -1318,7 +1312,7 @@ CONTAINS
 
        !WRITE(*,*) 'zidx,ze',zidx,ze
        !WRITE(*,*) 'slope',slope
-       
+
        ! Compute the semi-axes of the new lobe
        CALL compute_semiaxis(slope,new_x1, new_x2)
 
@@ -1366,5 +1360,70 @@ CONTAINS
        end do
     end do
   end subroutine argsort
+
+  ! Function to calculate the Beta PDF at a given point
+  REAL(wp) FUNCTION BetaPDF(x, a, b)
+
+    IMPLICIT NONE
+    
+    REAL(wp), INTENT(IN) :: x, a, b
+
+    ! Ensure x is in the valid range [0, 1]
+    IF (x < 0.0 .OR. x > 1.0) THEN
+       BetaPDF = 0.0
+    ELSE
+       BetaPDF = (x**(a-1.0) * (1.0-x)**(b-1.0)) / BetaFunc(a, b)
+    END IF
+    
+  END FUNCTION BetaPDF
+
+  ! Function to calculate the Beta function B(a, b)
+  REAL(wp) FUNCTION BetaFunc(a, b)
+
+    IMPLICIT NONE
+    
+    REAL(wp), INTENT(IN) :: a, b
+
+    BetaFunc = GammaFunc(a) * GammaFunc(b) / GammaFunc(a + b)
+
+  END FUNCTION BetaFunc
+
+  ! Function to calculate the Gamma function using an approximation (Lanczos approximation)
+  RECURSIVE FUNCTION GammaFunc(z) RESULT (GF)
+
+    USE parameters, ONLY : pi
+    
+    IMPLICIT NONE
+    
+    REAL(wp), INTENT(IN) :: z
+    REAL(wp) :: GF
+    REAL(wp) :: z1
+    REAL(wp) :: g, p(7), sum
+    INTEGER :: i
+
+    ! Lanczos coefficients for g=7, n=7
+    p = (/ 0.99999999999980993, 676.5203681218851, -1259.1392167224028, &
+         771.32342877765313, -176.61502916214059, 12.507343278686905, &
+         -0.13857109526572012 /)
+
+    IF (z < 0.5_wp) THEN
+
+       GF = pi / (SIN(pi*z) * GammaFunc(1.0_wp-z))
+
+    ELSE
+
+       z1 = z - 1.0
+       sum = p(1)
+
+       DO i = 2, 7
+          sum = sum + p(i) / (z1 + REAL(i-1))
+       END DO
+
+       g = 7.0
+       GF = SQRT(2.0*pi) * (z1+g+0.5)**(z1+0.5) * EXP(-(z1+g+0.5)) * sum
+
+    END IF
+
+  END FUNCTION GammaFunc
 
 END MODULE flow
