@@ -1517,6 +1517,9 @@ def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
 
             x_i = x_vent[int(i_vent)]
             y_i = y_vent[int(i_vent)]
+            
+        x_i = x_i.item()
+        y_i = y_i.item()
 
     return x_i, y_i
 
