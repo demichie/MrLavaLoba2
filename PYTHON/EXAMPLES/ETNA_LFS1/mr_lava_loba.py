@@ -1211,7 +1211,7 @@ def step0(lobe_exponent, i, force_max_length, distInt, start_from_dist_flag):
         # the parent lobe is chosen among all the lobes
 
         idx2 = i * idx1
-        idx = np.floor(idx2).astype(np.int64)
+        idx = np.int64(np.floor(idx2))
 
     if (start_from_dist_flag):
 
