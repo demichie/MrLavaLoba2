@@ -20,12 +20,19 @@ MODULE inpout
 
   IMPLICIT NONE
 
-  !> Flag for the output format
-  !> - T      => netCDF4 filed (.nc)
-  !> - F      => ESRI raster (.asc)
+  !> Flag for the output in NetCDF format
+  !> - T      => netCDF4 file saved (.nc)
+  !> - F      => not saved
   !> .
   LOGICAL :: nc_flag
 
+  !> Flag for the output in ESRI raster format
+  !> - T      => ascii file saved (.asc)
+  !> - F      => not saved
+  !> .
+  LOGICAL :: asc_flag
+
+  
   !> Flag for Jaccard index computation
   !> - T      => compute Jaccard index
   !> - F      => do not compute
@@ -46,7 +53,7 @@ MODULE inpout
 
   NAMELIST / run_parameters / run_name, source, vent_flag, crop_flag,           &
        hazard_flag, volume_flag, fixed_dimension_flag, topo_mod_flag,           &
-       restart_flag, nc_flag , union_diff_flag
+       restart_flag, nc_flag , asc_flag, union_diff_flag
 
   NAMELIST / vent_parameters / n_vents, x_vent, y_vent , x_vent_end , y_vent_end
 
@@ -524,6 +531,9 @@ CONTAINS
 
        WRITE(*,*) 'lx,ly ',lx,ly
 
+       CALL write_asc(Ztopo, 'cropped_DEM.asc', lx, ly, cell, 0.0_wp)
+                       
+
     ELSE
 
        nx = cols
@@ -643,6 +653,10 @@ CONTAINS
     REAL(wp) :: nd_ud
     REAL(wp), ALLOCATABLE :: xin_1D(:), yin_1D(:), Zs_ud(:,:), Zout_2D(:,:)
 
+    REAL(wp) :: Zs_temp(ny,nx)
+    REAL(wp) :: area_union, area_inters
+    REAL(wp) :: fitting_parameter
+    
     max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
 
     ! Sum the values in Zflow
@@ -651,6 +665,9 @@ CONTAINS
     IF ( union_diff_flag ) THEN
 
        CALL read_asc(union_diff_file,Zs_ud, lx_ud, ly_ud, cols_ud, rows_ud, cell_ud, nd_ud)
+
+       ! WRITE(*,*) lx_ud, ly_ud, cols_ud, rows_ud, cell_ud
+       ! WRITE(*,*) lx, ly, size(Zflow,2), size(Zflow,1), cell
 
        IF ( ( cols_ud .NE. size(Zflow,2)) .OR. (rows_ud .NE. size(Zflow,1)) .OR.&
             ( ABS(lx_ud-lx)>=eps ) .OR. ( ABS(ly_ud-ly)>=eps ) .OR. ( ABS(cell_ud-cell)>=eps ) ) THEN
@@ -671,6 +688,7 @@ CONTAINS
           CALL interp2Dgrids(xin_1D, yin_1D, Zs_ud, Xtopo, Ytopo, Zout_2D)
 
           DEALLOCATE( xin_1D , yin_1D )
+          DEALLOCATE( Zs_ud )
 
        ELSE
 
@@ -720,12 +738,14 @@ CONTAINS
 
                 CALL write_netcdf_2d(Zflow_mask,  masked_file, lx, ly, cell, 0.0_wp, 'm', 33 )
 
-             ELSE
+             END IF
+
+             IF ( asc_flag ) THEN
 
                 ! Concatenate the strings
                 masked_file = trim(run_name) // '_thickness_masked_' // trim(masking_str2) // '.asc'
 
-                CALL write_asc(Zflow, masked_file, lx, ly, cell, 0.0_wp)
+                CALL write_asc(Zflow_mask, masked_file, lx, ly, cell, 0.0_wp)
 
              END IF
 
@@ -735,7 +755,32 @@ CONTAINS
 
        END DO
 
+       IF ( union_diff_flag ) THEN
+
+          Zs_temp = MAX(Zout_2D, Zflow_mask)
+
+          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
+          area_union = SUM(Zs_temp) * cell**2
+
+          Zs_temp = MIN(Zout_2D, Zflow_mask)
+
+          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
+          area_inters = SUM(Zs_temp) * cell**2
+
+          fitting_parameter = area_inters / area_union
+
+          WRITE(*,*) '--------------------------------'
+          WRITE(*,*) 'With masking threshold', masking_threshold(i_thr)
+          WRITE(*,*) 'Union area', area_union, 'Intersect. area', area_inters
+          WRITE(*,*) 'Fitting parameter', fitting_parameter
+          
+       END IF
+
     END DO
+
+    DEALLOCATE( Zout_2D )
+
+    RETURN
 
   END SUBROUTINE write_masking
 

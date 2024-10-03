@@ -21,8 +21,9 @@ PROGRAM mr_lava_loba
 
   USE flow, ONLY : allocate_flow, init_fissure, flow_loop
   USE inpout, ONLY : init_param, read_param, read_topo, write_asc
-  USE inpout, ONLY : write_masking
+  USE inpout, ONLY : write_masking, write_netcdf_2d
   USE parameters, ONLY : init_run
+  USE inpout, ONLY : nc_flag, asc_flag
   
   IMPLICIT NONE
 
@@ -68,9 +69,20 @@ PROGRAM mr_lava_loba
   WRITE(*,*) 'Elapsed real time = ', DBLE( st3 - st2 ) / rate,'seconds'
 
   
-  output_file = trim(run_name) // '_thickness_full' // '.asc'  
-  CALL write_asc(Zflow, output_file, lx, ly, cell, 0.0_wp)
+  IF ( nc_flag) THEN
 
+     output_file = trim(run_name) // '_thickness_full' // '.nc'  
+     CALL write_netcdf_2d(Zflow, output_file, lx, ly, cell, 0.0_wp, 'm', 33 )
+
+  END IF
+
+  IF ( asc_flag ) THEN
+     
+     output_file = trim(run_name) // '_thickness_full' // '.asc'  
+     CALL write_asc(Zflow, output_file, lx, ly, cell, 0.0_wp)
+
+  END IF
+     
   CALL write_masking
   
 END PROGRAM mr_lava_loba
