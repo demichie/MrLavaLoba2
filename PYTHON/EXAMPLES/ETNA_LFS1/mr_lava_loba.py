@@ -730,7 +730,7 @@ def compute_semiaxis(slope, max_aspect_ratio, aspect_ratio_coeff, lobe_area):
 @njit(fastmath=True, nogil=True, cache=True)
 def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
               zidx, max_cells, lobe_area, max_aspect_ratio, aspect_ratio_coeff,
-              dist_fact, cos_angle1, sin_angle1, xcmin, ycmin, Ztot):
+              dist_fact, cos_angle1, sin_angle1, xcmin, ycmin, Ztot, nx, ny):
     """Compute 
 
     Parameters
@@ -2060,7 +2060,8 @@ for flow in range(0, n_flows):
         out_step4 = step4and5(deg2rad, new_angle, angle[idx], x1[idx], x2[idx],
                               x[idx], y[idx], zidx, max_cells, lobe_area,
                               max_aspect_ratio, aspect_ratio_coeff, dist_fact,
-                              cos_angle1, sin_angle1, xcmin, ycmin, Ztot)
+                              cos_angle1, sin_angle1, xcmin, ycmin, Ztot, nx, 
+                              ny)
 
         if out_step4[0] is None:
 
