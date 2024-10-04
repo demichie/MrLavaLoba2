@@ -78,11 +78,11 @@ PROGRAM mr_lava_loba
 
   IF ( asc_flag ) THEN
      
-     output_file = trim(run_name) // '_thickness_full' // '.asc'  
+     output_file = trim(run_name) // '_thickness_full' // '.asc'
      CALL write_asc(Zflow, output_file, lx, ly, cell, 0.0_wp)
 
   END IF
-     
+
   CALL write_masking
   
 END PROGRAM mr_lava_loba

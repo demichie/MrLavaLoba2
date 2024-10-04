@@ -90,6 +90,7 @@ CONTAINS
     IMPLICIT none
 
     nc_flag = .FALSE.
+    asc_flag = .FALSE.
 
     vent_flag = -1
 
@@ -480,6 +481,8 @@ CONTAINS
 
     REAL(wp) :: xE, xW, yS, yN
 
+    CHARACTER*40 :: output_file
+    
     CALL read_asc(source,arr_temp, lx, ly, cols, rows, cell, nd)
 
     allocate(xc_temp(cols))
@@ -531,9 +534,9 @@ CONTAINS
 
        WRITE(*,*) 'lx,ly ',lx,ly
 
-       CALL write_asc(Ztopo, 'cropped_DEM.asc', lx, ly, cell, 0.0_wp)
+       output_file = trim(run_name) // '_cropped_DEM.asc'
+       CALL write_asc(Ztopo, output_file, lx, ly, cell, 0.0_wp)
                        
-
     ELSE
 
        nx = cols
@@ -656,7 +659,7 @@ CONTAINS
     REAL(wp) :: Zs_temp(ny,nx)
     REAL(wp) :: area_union, area_inters
     REAL(wp) :: fitting_parameter
-    
+
     max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
 
     ! Sum the values in Zflow
@@ -774,11 +777,12 @@ CONTAINS
           WRITE(*,*) 'Union area', area_union, 'Intersect. area', area_inters
           WRITE(*,*) 'Fitting parameter', fitting_parameter
           
+          DEALLOCATE( Zout_2D )
+          
        END IF
 
     END DO
 
-    DEALLOCATE( Zout_2D )
 
     RETURN
 
@@ -857,6 +861,8 @@ CONTAINS
     INTEGER :: out_cells_x, out_cells_y
     INTEGER :: j
 
+    WRITE(*,*) "Saving asc file: ", TRIM(output_file)
+    
     OPEN(output_unit,FILE=TRIM(output_file),status='unknown',form='formatted')
 
     out_cells_y = size(out_array, 1)
@@ -877,6 +883,8 @@ CONTAINS
     ENDDO
 
     CLOSE(output_unit)
+
+    WRITE(*,*) "Saving completed"
 
   END SUBROUTINE write_asc
 
@@ -1019,7 +1027,9 @@ CONTAINS
     retval = nf90_close(ncid)
     if (retval /= nf90_noerr) stop 'Error closing NetCDF file.'
 
-    print *, "NetCDF file created successfully: ", TRIM(output_file)
+    WRITE(*,*) "NetCDF file created successfully: ", TRIM(output_file)
+
+    RETURN
 
   end subroutine write_netcdf_2d
 
