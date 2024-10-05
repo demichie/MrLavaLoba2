@@ -232,7 +232,8 @@ CONTAINS
     REAL(wp) :: new_angle
 
     LOGICAL :: check_step
-    
+
+    INTEGER :: j
 
     Ztot(1:ny,1:nx) = Ztopo(1:ny,1:nx)
     Zflow(1:ny,1:nx) = 0.0_wp
@@ -285,8 +286,8 @@ CONTAINS
             (avg_lobe_thickness - thickness_min) / (n_lobes - 1.0_wp)
 
        ! Print the results (optional)
-       !print *, 'Minimum Lobe Thickness:', thickness_min
-       !print *, 'Delta Lobe Thickness:', delta_lobe_thickness
+       ! print *, 'Minimum Lobe Thickness:', thickness_min
+       ! print *, 'Delta Lobe Thickness:', delta_lobe_thickness
        
        DO i = 1,n_init
 
@@ -302,34 +303,43 @@ CONTAINS
 
           dist_int(i) = 0
           descendents(i) = 0
-
+          
           CALL step1A(x(i), y(i), max_slope_angle, slope)
 
           CALL step2(slope, max_slope_angle, angle(i))
 
+          !angle(i) = 317.8996889005825_wp
+          !WRITE(*,*) 'angle(i)',angle(i)
+          
           CALL compute_semiaxis(slope,x1(i), x2(i))
-
+          
           CALL rasterize(x(i), y(i), x1(i), x2(i), angle(i), dist_int(i),       &
                i_West, i_East, j_South, j_North, Zflow_local, Dist_local,       &
                Zflow_local_int)
 
+          !write(*,*) Zflow_local
+
+
+          !read(*,*)
+          
           ! compute the thickness of the lobe
           lobe_thickness = thickness_min + (i - 1) * delta_lobe_thickness
 
-          ! WRITE(*,*) 'lobe_thickness ', lobe_thickness
+          ! WRITE(*,*) 'lobe_thickness',lobe_thickness
+          ! READ(*,*)
 
-          nx_local = i_East - i_West + 1
-          ny_local = j_North - j_South + 1
-
+          nx_local = i_East - i_West
+          ny_local = j_North - j_South
+          
           ! update the thickness of the flow with the new lobe
-          Zflow(j_South:j_North, i_West:i_East) =                               &
-               Zflow(j_South:j_North, i_West:i_East)                            &
+          Zflow(j_South:j_North-1, i_West:i_East-1) =                               &
+               Zflow(j_South:j_North-1, i_West:i_East-1)                            &
                + lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
 
           ! update the topography
-          Ztot(j_South:j_North, i_West:i_East) =                                &
-               Ztot(j_South:j_North, i_West:i_East)                             &
-               + filling_parameter(j_South:j_North, i_West:i_East)              &
+          Ztot(j_South:j_North-1, i_West:i_East-1) =                                &
+               Ztot(j_South:j_North-1, i_West:i_East-1)                             &
+               + filling_parameter(j_South:j_North-1, i_West:i_East-1)              &
                * lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
 
           ! store the bounding box of the new lobe
@@ -345,6 +355,9 @@ CONTAINS
 
        DO i = n_init+1,n_lobes
 
+          ! WRITE(*,*) 'i,x,y',i,x(i-1),y(i-1)
+          ! READ(*,*)
+
           IF (n_flows==1) THEN
 
              WRITE(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") ACHAR(13),              &
@@ -353,13 +366,15 @@ CONTAINS
 
           END IF
 
-          IF (lobe_exponent > 0) THEN
+          IF ( (lobe_exponent - 0.0_wp) > eps ) THEN
 
              CALL step0(i, dist_int(1:i), idx)
+             !WRITE(*,*) 'idx',idx
+             !READ(*,*)
 
           ELSE
 
-             idx = i-1
+             idx = i - 1
 
           END IF
 
@@ -387,19 +402,35 @@ CONTAINS
 
           END IF
 
+          
           CALL step1(xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx),          &
                angle(idx), slope, max_slope_angle, zidx)
 
+          !WRITE(*,*) 'xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx)',xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx)
+          !WRITE(*,*) 'angle(idx), slope, max_slope_angle, zidx',angle(idx), slope, max_slope_angle, zidx
+
+          ! WRITE(*,*) 'max_slope_angle',max_slope_angle
+          
           CALL step2(slope, max_slope_angle, temp_angle)
 
+          ! WRITE(*,*) 'temp_angle',temp_angle
+          !WRITE(*,*) 'slope,atan(slope)',slope,atan(slope)
+          !READ(*,*)
+          
           CALL step3(angle(idx),  temp_angle, slope, cos_angle1, sin_angle1,    &
                new_angle)
 
+          !new_angle = 313.00116002201054_wp  
+          !WRITE(*,*) 'new_angle',new_angle
+          
           CALL step4and5(new_angle, angle(idx), x1(idx), x2(idx), x(idx),       &
                y(idx), zidx, cos_angle1, sin_angle1, check_step, x(i), y(i),    &
                x1(i), x2(i), angle(i))
 
-          ! WRITE(*,*) 'x1(i), x2(i)',x1(i), x2(i)
+          x(i) = nint( x(i) * 100.0_wp) / 100.0_wp
+          y(i) = nint( y(i) * 100.0_wp) / 100.0_wp
+          
+          !WRITE(*,*) 'x(i), y(i)',x(i), y(i)
 
           IF (.NOT.check_step) THEN
 
@@ -412,25 +443,37 @@ CONTAINS
                i_West, i_East, j_South, j_North, Zflow_local, Dist_local,       &
                Zflow_local_int)
 
+          nx_local = i_East - i_West
+          ny_local = j_North - j_South
+
+          !WRITE(*,*) 'i_West, i_East, j_South, j_North',i_West, i_East, j_South, j_North
+          !WRITE(*,*) 'max_cells',max_cells
+          !WRITE(*,*) 'Zflow_local'
+          !WRITE(*,*) Zflow_local(1:ny_local,1:nx_local)
+          
+          
           ! compute the thickness of the lobe
           lobe_thickness = thickness_min + (i - 1) * delta_lobe_thickness
 
           ! WRITE(*,*) 'lobe_thickness ', lobe_thickness
 
-          nx_local = i_East - i_West + 1
-          ny_local = j_North - j_South + 1
 
           ! update the thickness of the flow with the new lobe
-          Zflow(j_South:j_North, i_West:i_East) =                               &
-               Zflow(j_South:j_North, i_West:i_East)                            &
+          Zflow(j_South:j_North-1, i_West:i_East-1) =                           &
+               Zflow(j_South:j_North-1, i_West:i_East-1)                        &
                + lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
-
+          
           ! update the topography
-          Ztot(j_South:j_North, i_West:i_East) =                                &
-               Ztot(j_South:j_North, i_West:i_East)                             &
-               + filling_parameter(j_South:j_North, i_West:i_East)              &
+          Ztot(j_South:j_North-1, i_West:i_East-1) =                            &
+               Ztot(j_South:j_North-1, i_West:i_East-1)                         &
+               + filling_parameter(j_South:j_North-1, i_West:i_East-1)          &
                * lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
 
+          !WRITE(*,*) 'Ztot'
+          !DO j=j_South,j_North-1
+          !   WRITE(*,*) Ztot(j, i_West:i_East-1)
+          !END DO
+             
           ! store the bounding box of the new lobe
           jNorth_array(i) = j_North
           jSouth_array(i) = j_South
@@ -465,12 +508,12 @@ CONTAINS
     IF (allocated(x_vent_end) .and. size(x_vent_end) > 0 .and. vent_flag > 3)   &
          THEN
 
-       first_j = 0
+       first_j = 1
        allocate(cum_fiss_length(n_vents + 1))
 
     ELSE
 
-       first_j = 1
+       first_j = 2
        allocate(cum_fiss_length(n_vents))
 
     END IF
@@ -478,21 +521,21 @@ CONTAINS
     cum_fiss_length = 0.0_wp
 
     ! Loop over vents
-    do j = first_j, n_vents-1
+    do j = first_j, n_vents
 
        if (allocated(x_vent_end) .and. size(x_vent_end) > 0 .and. vent_flag > 3)&
             then
 
-          delta_xvent = x_vent_end(j+1) - x_vent(j+1)
-          delta_yvent = y_vent_end(j+1) - y_vent(j+1)
-          cum_fiss_length(j+1) = cum_fiss_length(j) + sqrt(delta_xvent**2 +     &
+          delta_xvent = x_vent_end(j) - x_vent(j)
+          delta_yvent = y_vent_end(j) - y_vent(j)
+          cum_fiss_length(j) = cum_fiss_length(j-1) + sqrt(delta_xvent**2 +     &
                delta_yvent**2)
 
        else
 
-          delta_xvent = x_vent(j+1) - x_vent(j)
-          delta_yvent = y_vent(j+1) - y_vent(j)
-          cum_fiss_length(j+1) = cum_fiss_length(j) + sqrt(delta_xvent**2 +     &
+          delta_xvent = x_vent(j) - x_vent(j-1)
+          delta_yvent = y_vent(j) - y_vent(j-1)
+          cum_fiss_length(j) = cum_fiss_length(j-1) + sqrt(delta_xvent**2 +     &
                delta_yvent**2)
 
        end if
@@ -522,7 +565,7 @@ CONTAINS
     end if
 
     ! (Optional) Print the cumulative fissure lengths for debugging
-    ! print *, cum_fiss_length
+    WRITE(*,*) 'cum_fiss_length',cum_fiss_length
 
     RETURN
 
@@ -592,6 +635,8 @@ CONTAINS
           num = alfa_polyline - cum_fiss_length(idx_vent - 1)
           den = cum_fiss_length(idx_vent) - cum_fiss_length(idx_vent - 1)
           alfa_segment = num / den
+
+          ! WRITE(*,*) 'idx_vent,alfa_segment',idx_vent,alfa_segment
 
           x_i = alfa_segment * x_vent(idx_vent) + &
                (1.0 - alfa_segment) * x_vent(idx_vent - 1)
@@ -689,9 +734,13 @@ CONTAINS
     call coorToIdx(x_i, xcmin, inv_cell, ix, xi)
     call coorToIdx(y_i, ycmin, inv_cell, iy, yi)
 
+    !WRITE(*,*) x_i, xcmin, inv_cell,ix, xi
+    !WRITE(*,*) y_i, ycmin, inv_cell,iy, yi
+    !READ(*,*)
+    
     ! Calculate baricentric coordinates (fraction within the cell)
-    xi_fract = xi - real(ix)
-    yi_fract = yi - real(iy)
+    xi_fract = xi - real(ix) + 1.0_wp
+    yi_fract = yi - real(iy) + 1.0_wp
 
     ix1 = ix+1
     iy1 = iy+1
@@ -703,13 +752,18 @@ CONTAINS
     Fy_test = (xi_fract * (Ztot(iy1, ix1) - Ztot(iy, ix1)) +                    &
          (1.0_wp - xi_fract) * (Ztot(iy1, ix) - Ztot(iy, ix))) * inv_cell
 
+    !WRITE(*,*) 'yi_fract',yi_fract
+    !WRITE(*,*) Ztot(iy1, ix1),  Ztot(iy1, ix), Ztot(iy, ix1), Ztot(iy, ix)
+    !WRITE(*,*) 'Fx_test,Fy_test',Fx_test,Fy_test
+    
     ! Calculate the maximum slope angle (in degrees)
     max_slope_angle = mod(180.0_wp + atan2d(Fy_test, Fx_test), 360.0_wp)
 
     ! Calculate the slope at the lobe center
     slope = sqrt(Fx_test**2 + Fy_test**2)
 
-    ! WRITE(*,*) " max_slope_angle, slope ", max_slope_angle, slope
+    !WRITE(*,*) " max_slope_angle, slope ", max_slope_angle, slope
+    !READ(*,*)
 
   end subroutine step1A
 
@@ -772,6 +826,7 @@ CONTAINS
 
     USE parameters, ONLY : nx, ny
     USE parameters, ONLY : lx, ly
+    USE parameters, ONLY : xcmin, ycmin
 
     implicit none
 
@@ -792,21 +847,21 @@ CONTAINS
     min_ye = minval(ye)
     max_ye = maxval(ye)
 
-    ! WRITE(*,*) 'min_xe, max_xe, min_ye, max_ye',min_xe, max_xe, min_ye, max_ye
+    !WRITE(*,*) 'min_xe, max_xe, min_ye, max_ye',min_xe, max_xe, min_ye, max_ye
     ! WRITE(*,*) 'lx, ly', lx, ly
 
     ! Compute the bounding box indices for the grid
-    call coorToIdx(min_xe, lx, inv_cell, idx_west, xi)
+    call coorToIdx(min_xe, xcmin, inv_cell, idx_west, xi)
     i_West = max(1, min(nx, idx_west))
 
-    call coorToIdx(max_xe, lx, inv_cell, idx_east, xi)
-    i_East = max(1, min(nx, idx_east))
+    call coorToIdx(max_xe, xcmin, inv_cell, idx_east, xi)
+    i_East = max(1, min(nx, idx_east+2))
 
-    call coorToIdx(min_ye, ly, inv_cell, idx_south, yi)
+    call coorToIdx(min_ye, ycmin, inv_cell, idx_south, yi)
     j_South = max(1, min(ny, idx_south))
 
-    call coorToIdx(max_ye, ly, inv_cell, idx_north, yi)
-    j_North = max(1, min(ny, idx_north ))
+    call coorToIdx(max_ye, ycmin, inv_cell, idx_north, yi)
+    j_North = max(1, min(ny, idx_north+2 ))
 
     ! WRITE(*,*) 'i_West, i_East, j_South, j_North',i_West, i_East, j_South, j_North
     ! WRITE(*,*) Xtopo(j_South,i_West)-0.5_wp*cell, Xtopo(j_North,i_East)+0.5_wp*cell
@@ -880,7 +935,7 @@ CONTAINS
     REAL(wp) :: xc_i , yc_i
 
     INTEGER :: i
-    ! INTEGER :: j
+    INTEGER :: j
 
     ! Compute cosine and sine of the angle
     c = cosd(angle)
@@ -926,17 +981,19 @@ CONTAINS
          [ny_cell, nx_cell])
 
     ! Print the array with 2 decimal places
-    !do i = 1, ny_cell
-    !   do j = 1, nx_cell
-    !      if (j < nx_cell) then
-    !         write(*,'(F6.2, 1X)', advance='no') area_fract(i, j)
-    !      else
-    !         write(*,'(F6.2)', advance='no') area_fract(i, j)
-    !      end if
-    !   end do
-    !   write(*,*) ! Newline after each row
-    !end do
-    !write(*,*)
+!!$    write(*,*)
+!!$    do i = 1, ny_cell
+!!$       do j = 1, nx_cell
+!!$          if (j < nx_cell) then
+!!$             write(*,'(F6.2, 1X)', advance='no') area_fract(i, j)
+!!$          else
+!!$             write(*,'(F6.2)', advance='no') area_fract(i, j)
+!!$          end if
+!!$       end do
+!!$       write(*,*) ! Newline after each row
+!!$    end do
+!!$    write(*,*)
+!!$    read(*,*)
 
     RETURN
 
@@ -968,16 +1025,19 @@ CONTAINS
     ! Compute the points of the lobe
     CALL ellipse(x_i, y_i, x1_i, x2_i, angle_i, xe, ye)
 
+    !WRITE(*,*) 'x_i, y_i, x1_i, x2_i, angle_i',x_i, y_i, x1_i, x2_i, angle_i
+    !READ(*,*)
+    
     ! Compute the bounding box for the new lobe
     CALL bounding_box(xe, ye, i_West, i_East, j_South, j_North)
 
     ! Define the subgrid of pixels to check for coverage
-    nx_local = i_East - i_West + 1
-    ny_local = j_North - j_South + 1
+    nx_local = i_East - i_West
+    ny_local = j_North - j_South
 
     ! Compute the fraction of cells covered by the lobe
-    CALL local_intersection( Xtopo(j_South:j_North, i_West:i_East),             &
-         Ytopo(j_South:j_North, i_West:i_East), x_i, y_i, x1_i, x2_i,           &
+    CALL local_intersection( Xtopo(j_South:j_North-1, i_West:i_East-1),             &
+         Ytopo(j_South:j_North-1, i_West:i_East-1), x_i, y_i, x1_i, x2_i,           &
          angle_i, Zflow_local, nx_local, ny_local)
 
     ! Compute the integer version (0 = pixel not covered by lobe, 1 = covered)
@@ -1019,7 +1079,7 @@ CONTAINS
        mask = merge(1, 0,distInt < max_length)
        ! mask = distInt < max_length
        idx2 = sum(mask) * idx1
-       idx3 = floor(idx2)
+       idx3 = ceiling(idx2)
        idx = int(idx3)
 
        ! Sort distInt and find corresponding index
@@ -1075,8 +1135,8 @@ CONTAINS
     iy1 = iy + 1
 
     ! Compute the baricentric coordinates of the lobe center in the pixel
-    xi_fract = xi - ix
-    yi_fract = yi - iy
+    xi_fract = xi - ix + 1.0_wp
+    yi_fract = yi - iy + 1.0_wp
 
     ! Interpolate the elevation at the corners of the pixel to find the
     ! elevation at the lobe center
@@ -1094,13 +1154,13 @@ CONTAINS
        xei = (xe(i) - xcmin) * inv_cell
        yei = (ye(i) - ycmin) * inv_cell
 
-       ixe = floor(xei)
-       iye = floor(yei)
+       ixe = ceiling(xei)
+       iye = ceiling(yei)
 
        ! Compute the local coordinates of the points within the pixels containing
        ! them
-       xei_fract = xei - ixe
-       yei_fract = yei - iye
+       xei_fract = xei - ixe + 1.0_wp
+       yei_fract = yei - iye + 1.0_wp
 
        ixe1 = ixe + 1
        iye1 = iye + 1
@@ -1112,6 +1172,12 @@ CONTAINS
 
     END DO
 
+    !WRITE(*,*) 'xe',xe
+    !WRITE(*,*) 'ye',ye
+    !WRITE(*,*) 'ze',ze
+    !READ(*,*)
+
+    
     ! Find the point on the ellipse with minimum elevation
     idx_min = minloc(ze,DIM=1)
 
@@ -1141,7 +1207,7 @@ CONTAINS
     real(wp), intent(out) :: new_angle
 
     ! Local variables
-    real(wp) :: slopedeg, sigma, rand, rand_angle_new
+    real(wp) :: slopedeg, sigma, rand(2), rand_angle_new
     logical :: check_flag
 
     ! Default to the unperturbed angle
@@ -1152,6 +1218,8 @@ CONTAINS
        ! Convert slope to degrees
        slopedeg = atand(slope)
 
+       !WRITE(*,*) 'slopedeg',slopedeg
+
        IF (slopedeg > 0.0_wp .and. max_slope_prob > 0.0_wp) THEN
 
           sigma = (1.0_wp-max_slope_prob) / max_slope_prob * (90.0_wp-slopedeg) &
@@ -1161,9 +1229,11 @@ CONTAINS
           DO WHILE (check_flag)
 
              ! Generate a random normal value
-             CALL random_number(rand)
-             rand_angle_new = sigma * sqrt(-2.0_wp * log(rand)) *               &
-                  cos(2.0_wp * pi * rand)
+             !CALL random_number(rand)
+             !rand_angle_new = sigma * sqrt(-2.0_wp * log(rand(1))) *               &
+             !     cos(2.0_wp * pi * rand(2))
+
+             rand_angle_new = sigma * rnorm_box_muller_single_variate()
 
              ! Check if the angle is within bounds
              IF (-180.0_wp<=rand_angle_new .AND. rand_angle_new<=180.0_wp) THEN
@@ -1178,7 +1248,7 @@ CONTAINS
 
           ! Generate a uniform random value
           CALL random_number(rand)
-          rand_angle_new = 360.0_wp * ABS(rand - 0.5_wp)
+          rand_angle_new = 360.0_wp * ABS(rand(1) - 0.5_wp)
 
        END IF
 
@@ -1186,8 +1256,6 @@ CONTAINS
        new_angle = max_slope_angle + rand_angle_new
 
     END IF
-
-    ! WRITE(*,*) 'new_angle ',new_angle
 
     RETURN
 
@@ -1199,6 +1267,7 @@ CONTAINS
 
     USE parameters, ONLY : inertial_exponent
     USE parameters, ONLY : pi
+    USE parameters, ONLY : eps
 
     implicit none
     ! Input variables
@@ -1219,7 +1288,7 @@ CONTAINS
     cos_angle2 = cosd(old_angle)
     sin_angle2 = sind(old_angle)
 
-    if ( abs(inertial_exponent-0.0_wp) <= epsilon(0.0_wp) ) then
+    if ( abs(inertial_exponent-0.0_wp) <= eps ) then
 
        alfa_inertial = 0.0_wp
 
@@ -1313,8 +1382,8 @@ CONTAINS
 
        check_step = .TRUE.  ! default value when no stopping condition is met
 
-       xi_fract = xi - ix
-       yi_fract = yi - iy
+       xi_fract = xi - ix + 1.0_wp
+       yi_fract = yi - iy + 1.0_wp
 
        ! Interpolate Ztot at the new budding point
        ze = xi_fract * (yi_fract * Ztot(iy1, ix1) +                             &
@@ -1331,6 +1400,8 @@ CONTAINS
        ! Compute the semi-axes of the new lobe
        CALL compute_semiaxis(slope,new_x1, new_x2)
 
+       !WRITE(*,*) 'slope,new_x1',slope,new_x1
+       
        ! Calculate v1 and v2
        v1 = sqrt(delta_x**2 + delta_y**2)
        v2 = v1 + new_x1
@@ -1338,6 +1409,9 @@ CONTAINS
        ! Calculate v
        v = (v1 * (1.0_wp - dist_fact) + v2 * dist_fact) / v1
 
+       !WRITE(*,*) 'v1,v2',v1,v2
+       !WRITE(*,*) 'v,delta_x,delta_y',v,delta_x,delta_y
+       
        ! Compute the new lobe center coordinates
        x_new = x_idx + v * delta_x
        y_new = y_idx + v * delta_y
@@ -1375,5 +1449,21 @@ CONTAINS
        end do
     end do
   end subroutine argsort
+  
+  function rnorm_box_muller_single_variate() result(variate)
+
+    USE parameters, ONLY : pi
+
+    implicit none
+
+    ! return a standard normal variate
+    real(wp) :: variate
+    real(wp) :: u(2), factor, arg
+
+    call random_number(u)
+    factor = sqrt(-2.0_wp * log(u(1)))
+    arg = 2.0_wp * pi *u(2)
+    variate = factor * cos(arg)
+  end function rnorm_box_muller_single_variate
 
 END MODULE flow

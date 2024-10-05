@@ -511,10 +511,10 @@ CONTAINS
        WRITE(*,*) 'xW,xE,yS,yN', xW, xE, yS, yN
 
        ! crop the DEM to the desired domain
-       iW = MAX(1, (floor((xW - lx) / cell)) )
-       iE = MIN(cols, (ceiling((xE - lx) / cell)) )
-       jS = MAX(1, (floor((yS - ly) / cell)) )
-       jN = MIN(rows, (ceiling((yN - ly) / cell)) )
+       iW = MAX(0, (floor((xW - lx) / cell)) ) + 1
+       iE = MIN(cols, (ceiling((xE - lx) / cell)) ) + 1
+       jS = MAX(0, (floor((yS - ly) / cell)) ) + 1
+       jN = MIN(rows, (ceiling((yN - ly) / cell)) ) + 1
 
        WRITE(*,*) 'iW,iE,jS,jN', iW, iE, jS, jN
        WRITE(*,*)
@@ -558,6 +558,9 @@ CONTAINS
 
     ycmin = MINVAL(yc)
     ycmax = MAXVAL(yc)
+
+    !WRITE(*,*) 'xcmin,xcmax ',xcmin,xcmax
+    !WRITE(*,*) 'ycmin,ycmax ',ycmin,ycmax
 
     allocate(Xtopo(ny, nx))
     allocate(Ytopo(ny, nx))
@@ -758,32 +761,31 @@ CONTAINS
 
        END DO
 
-       IF ( union_diff_flag ) THEN
-
-          Zs_temp = MAX(Zout_2D, Zflow_mask)
-
-          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
-          area_union = SUM(Zs_temp) * cell**2
-
-          Zs_temp = MIN(Zout_2D, Zflow_mask)
-
-          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
-          area_inters = SUM(Zs_temp) * cell**2
-
-          fitting_parameter = area_inters / area_union
-
-          WRITE(*,*) '--------------------------------'
-          WRITE(*,*) 'With masking threshold', masking_threshold(i_thr)
-          WRITE(*,*) 'Union area', area_union, 'Intersect. area', area_inters
-          WRITE(*,*) 'Fitting parameter', fitting_parameter
-          
-          DEALLOCATE( Zout_2D )
-          
-       END IF
+!!$       IF ( union_diff_flag ) THEN
+!!$
+!!$          Zs_temp = MAX(Zout_2D, Zflow_mask)
+!!$
+!!$          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
+!!$          area_union = SUM(Zs_temp) * cell**2
+!!$
+!!$          Zs_temp = MIN(Zout_2D, Zflow_mask)
+!!$
+!!$          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
+!!$          area_inters = SUM(Zs_temp) * cell**2
+!!$
+!!$          fitting_parameter = area_inters / area_union
+!!$
+!!$          WRITE(*,*) '--------------------------------'
+!!$          WRITE(*,*) 'With masking threshold', masking_threshold(i_thr)
+!!$          WRITE(*,*) 'Union area', area_union, 'Intersect. area', area_inters
+!!$          WRITE(*,*) 'Fitting parameter', fitting_parameter
+!!$          
+!!$       END IF
 
     END DO
 
-
+    IF ( union_diff_flag ) DEALLOCATE( Zout_2D )       
+       
     RETURN
 
   END SUBROUTINE write_masking
@@ -1079,18 +1081,18 @@ CONTAINS
 
     ! Compute ix and iy, ensuring indices are within bounds
     do i = 1, nx_out
-       ix(i) = max(0, min(nx_in-2, floor(xi(i))))
+       ix(i) = max(1, min(nx_in-1, ceiling(xi(i))))
        ix1(i) = ix(i) + 1
     end do
 
     do j = 1, ny_out
-       iy(j) = max(0, min(ny_in-2, floor(yi(j))))
+       iy(j) = max(1, min(ny_in-1, ceiling(yi(j))))
        iy1(j) = iy(j) + 1
     end do
 
     ! Compute fractional coordinates within each cell
-    xi_fract = max(0.0_wp, min(1.0_wp, xi - real(ix)))
-    yi_fract = max(0.0_wp, min(1.0_wp, yi - real(iy)))
+    xi_fract = max(0.0_wp, min(1.0_wp, xi - real(ix) + 1.0_wp))
+    yi_fract = max(0.0_wp, min(1.0_wp, yi - real(iy) + 1.0_wp))
 
     ! Compute the bilinear interpolation factors
     do j = 1, ny_out
