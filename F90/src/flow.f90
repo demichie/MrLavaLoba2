@@ -239,8 +239,6 @@ CONTAINS
 
     LOGICAL :: check_step
 
-    INTEGER :: j
-
     Ztot(1:ny,1:nx) = Ztopo(1:ny,1:nx)
     Zflow(1:ny,1:nx) = 0.0_wp
     n_lobes_tot = 0
@@ -769,7 +767,6 @@ CONTAINS
   subroutine bounding_box(xe, ye, i_West, i_East, j_South, j_North)
 
     USE parameters, ONLY : nx, ny
-    USE parameters, ONLY : lx, ly
     USE parameters, ONLY : xcmin, ycmin
 
     implicit none
@@ -873,7 +870,6 @@ CONTAINS
     REAL(wp) :: xc_i , yc_i
 
     INTEGER :: i
-    INTEGER :: j
 
     ! Compute cosine and sine of the angle
     c = cosd(angle)
@@ -1126,7 +1122,6 @@ CONTAINS
   subroutine step2(slope, max_slope_angle, new_angle)
 
     USE parameters, ONLY : max_slope_prob
-    USE parameters, ONLY : pi
     implicit none
 
     ! Inputs
@@ -1156,10 +1151,6 @@ CONTAINS
           DO WHILE (check_flag)
 
              ! Generate a random normal value
-             !CALL random_number(rand)
-             !rand_angle_new = sigma * sqrt(-2.0_wp * log(rand(1))) *               &
-             !     cos(2.0_wp * pi * rand(2))
-
              rand_angle_new = sigma * rnorm_box_muller_single_variate()
 
              ! Check if the angle is within bounds
@@ -1383,6 +1374,7 @@ CONTAINS
     factor = sqrt(-2.0_wp * log(u(1)))
     arg = 2.0_wp * pi *u(2)
     variate = factor * cos(arg)
+    
   end function rnorm_box_muller_single_variate
 
 END MODULE flow

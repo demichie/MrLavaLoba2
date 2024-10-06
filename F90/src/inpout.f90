@@ -229,9 +229,24 @@ CONTAINS
 
        IF ( ABS(x_vent_end(1) - (-9999.0_wp) )>= eps ) THEN
 
-          DEALLOCATE(x_vent_end,y_vent_end)
-          ALLOCATE(x_vent_end(0),y_vent_end(0))
+          ALLOCATE(x_vent_end_temp(n_vents))
+          ALLOCATE(y_vent_end_temp(n_vents))
+          
+          x_vent_end_temp(1:n_vents) = x_vent_end(1:n_vents)
+          y_vent_end_temp(1:n_vents) = y_vent_end(1:n_vents)
+          
+          DEALLOCATE(x_vent_end)
+          DEALLOCATE(y_vent_end)
 
+          ALLOCATE(x_vent_end(n_vents))
+          ALLOCATE(y_vent_end(n_vents))
+
+          x_vent_end_temp(1:n_vents) = x_vent_end(1:n_vents)
+          y_vent_end_temp(1:n_vents) = y_vent_end(1:n_vents)
+
+          DEALLOCATE(x_vent_end_temp)
+          DEALLOCATE(y_vent_end_temp)
+                    
        END IF
        
        REWIND(input_unit)
@@ -638,7 +653,6 @@ CONTAINS
     IMPLICIT NONE
 
     INTEGER :: i_thr, i
-    INTEGER :: k
     INTEGER :: max_lobes
 
     REAL(wp) :: total_Zflow, total_masked_Zflow
@@ -739,8 +753,6 @@ CONTAINS
     REAL(wp) :: cell_ud
     REAL(wp) :: nd_ud
     REAL(wp), ALLOCATABLE :: xin_1D(:), yin_1D(:), Zs_ud(:,:), Zout_2D(:,:)
-
-    REAL(wp) :: Zs_temp(ny,nx)
 
     INTEGER :: i, max_lobes
 
@@ -853,8 +865,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: cell_size
     REAL(wp), INTENT(IN) :: nodata
 
-    REAL(wp) ::out_array1D(size(out_array,2))
-
     INTEGER :: out_cells_x, out_cells_y
     INTEGER :: j
 
@@ -921,7 +931,6 @@ CONTAINS
     character(len=16) :: crs_name
 
     INTEGER :: i
-    INTEGER :: j
 
     ! Calculate cell centers
     do i = 1, nx
