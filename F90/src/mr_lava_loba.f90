@@ -16,12 +16,13 @@ PROGRAM mr_lava_loba
 
   USE inpout, ONLY : run_name
   USE parameters, ONLY : wp
+  USE parameters, ONLY : union_diff_flag
   USE parameters, ONLY : lx, ly, cell
   USE flow
 
   USE flow, ONLY : allocate_flow, init_fissure, flow_loop
   USE inpout, ONLY : init_param, read_param, read_topo, write_asc
-  USE inpout, ONLY : write_masking, write_netcdf_2d
+  USE inpout, ONLY : write_masking, write_netcdf_2d, init_union_diff
   USE parameters, ONLY : init_run
   USE inpout, ONLY : nc_flag, asc_flag
   
@@ -53,7 +54,9 @@ PROGRAM mr_lava_loba
 
   CALL allocate_flow
 
-  WRITE(*,*) 'End pre-processing'
+  IF (union_diff_flag) CALL init_union_diff
+
+    WRITE(*,*) 'End pre-processing'
   WRITE(*,*)
 
   CALL cpu_time(t2)
@@ -84,6 +87,7 @@ PROGRAM mr_lava_loba
   END IF
 
   CALL write_masking
+
   
 END PROGRAM mr_lava_loba
 

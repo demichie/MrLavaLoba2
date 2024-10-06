@@ -79,6 +79,12 @@ MODULE parameters
   !> .
   LOGICAL :: restart_flag
 
+  !> Flag for Jaccard index computation
+  !> - T      => compute Jaccard index
+  !> - F      => do not compute
+  !> .
+  LOGICAL :: union_diff_flag
+  
   INTEGER :: n_vents
   REAL(wp), ALLOCATABLE :: x_vent(:)
   REAL(wp), ALLOCATABLE :: y_vent(:)

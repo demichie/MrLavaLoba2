@@ -56,6 +56,9 @@ MODULE flow
   REAL(wp), ALLOCATABLE :: Zflow(:,:)
   REAL(wp), ALLOCATABLE :: Zflow_mask(:,:)
 
+  !> Flow thickness for uniondiff
+  REAL(wp), ALLOCATABLE :: Zud(:,:)
+  
   !> Map of lobe distances from the vent
   INTEGER, ALLOCATABLE :: Dist(:,:)
 
@@ -97,6 +100,7 @@ CONTAINS
     USE parameters, ONLY : nv, nv2, cell
     USE parameters, ONLY : lobe_area, max_aspect_ratio
     USE parameters, ONLY : nx, ny
+    USE parameters, ONLY : union_diff_flag
 
     IMPLICIT NONE
 
@@ -179,6 +183,8 @@ CONTAINS
     ALLOCATE( Ztot(ny,nx) ,  Zflow(ny,nx) ,  Zflow_mask(ny,nx) )
     ALLOCATE( Zflow_local_array(alloc_n_lobes,max_cells,max_cells) )
 
+    IF (union_diff_flag) ALLOCATE( Zud(ny,nx) )
+    
     RETURN
 
 

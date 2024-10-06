@@ -32,13 +32,6 @@ MODULE inpout
   !> .
   LOGICAL :: asc_flag
 
-  
-  !> Flag for Jaccard index computation
-  !> - T      => compute Jaccard index
-  !> - F      => do not compute
-  !> .
-  LOGICAL :: union_diff_flag
-
   CHARACTER(LEN=40) :: input_file         !< File with the run parameters
   CHARACTER(LEN=40) :: backup_file        !< Bakcup File with the run parameters
   CHARACTER(LEN=40) :: union_diff_file    !< File with previous output to compare
@@ -640,7 +633,7 @@ CONTAINS
 
   SUBROUTINE write_masking
 
-    USE flow, ONLY : Zflow, Zflow_mask
+    USE flow, ONLY : Zflow, Zflow_mask, Zud
 
     IMPLICIT NONE
 
@@ -652,15 +645,6 @@ CONTAINS
     REAL(wp) :: threshold
     REAL(wp) :: volume_fraction
     CHARACTER(LEN=40) :: masked_file, masking_str1, masking_str2
-
-    REAL(wp) :: lx_ud, ly_ud
-    INTEGER :: cols_ud, rows_ud
-    REAL(wp) :: cell_ud
-    REAL(wp) :: nd_ud
-    REAL(wp), ALLOCATABLE :: xin_1D(:), yin_1D(:), Zs_ud(:,:), Zout_2D(:,:)
-
-    REAL(wp) :: Zs_temp(ny,nx)
-    REAL(wp) :: area_union, area_inters
     REAL(wp) :: fitting_parameter
 
     max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
@@ -668,48 +652,12 @@ CONTAINS
     ! Sum the values in Zflow
     total_Zflow = sum(Zflow)
 
-    IF ( union_diff_flag ) THEN
-
-       CALL read_asc(union_diff_file,Zs_ud, lx_ud, ly_ud, cols_ud, rows_ud, cell_ud, nd_ud)
-
-       ! WRITE(*,*) lx_ud, ly_ud, cols_ud, rows_ud, cell_ud
-       ! WRITE(*,*) lx, ly, size(Zflow,2), size(Zflow,1), cell
-
-       IF ( ( cols_ud .NE. size(Zflow,2)) .OR. (rows_ud .NE. size(Zflow,1)) .OR.&
-            ( ABS(lx_ud-lx)>=eps ) .OR. ( ABS(ly_ud-ly)>=eps ) .OR. ( ABS(cell_ud-cell)>=eps ) ) THEN
-
-          WRITE(*,*) "Union_diff_file", union_diff_file
-          WRITE(*,*) "Different header: interpolating data"
-
-          ALLOCATE( xin_1D(cols_ud) , yin_1D(rows_ud) )
-
-          ! Calculate cell centers
-          do i = 1, cols_ud
-             xin_1D(i) = lx_ud + cell_ud * (0.5 + (i - 1))
-          end do
-          do i = 1, rows_ud
-             yin_1D(i) = ly_ud + cell_ud * (0.5 + (i - 1))
-          end do
-          
-          CALL interp2Dgrids(xin_1D, yin_1D, Zs_ud, Xtopo, Ytopo, Zout_2D)
-
-          DEALLOCATE( xin_1D , yin_1D )
-          DEALLOCATE( Zs_ud )
-
-       ELSE
-
-          CALL read_asc(union_diff_file,Zout_2D, lx_ud, ly_ud, cols_ud, rows_ud, cell_ud, nd_ud)
-           
-       END IF
-
-    END IF
-
     DO i_thr = 1,n_masking
 
        DO i = 1,10*max_lobes
 
           threshold = i * 0.1_wp * avg_lobe_thickness
-          
+
           Zflow_mask = Zflow * merge(1.0_wp,0.0_wp,Zflow.GT.threshold)
           total_masked_Zflow = sum(Zflow_mask)
 
@@ -758,38 +706,85 @@ CONTAINS
              EXIT
 
           END IF
-
+          
        END DO
 
-!!$       IF ( union_diff_flag ) THEN
-!!$
-!!$          Zs_temp = MAX(Zout_2D, Zflow_mask)
-!!$
-!!$          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
-!!$          area_union = SUM(Zs_temp) * cell**2
-!!$
-!!$          Zs_temp = MIN(Zout_2D, Zflow_mask)
-!!$
-!!$          Zs_temp = Zs_temp / MAX(Zs_temp, 1.0_wp)
-!!$          area_inters = SUM(Zs_temp) * cell**2
-!!$
-!!$          fitting_parameter = area_inters / area_union
-!!$
-!!$          WRITE(*,*) '--------------------------------'
-!!$          WRITE(*,*) 'With masking threshold', masking_threshold(i_thr)
-!!$          WRITE(*,*) 'Union area', area_union, 'Intersect. area', area_inters
-!!$          WRITE(*,*) 'Fitting parameter', fitting_parameter
-!!$          
-!!$       END IF
-
+       IF (union_diff_flag) THEN
+          
+          fitting_parameter = REAL(count( MIN(Zud, Zflow_mask) > 0 )) /    &
+               REAL(count( MAX(Zud, Zflow_mask) > 0 ))
+          
+          WRITE(*,*) '--------------------------------'
+          WRITE(*,*) 'With masking threshold', masking_threshold(i_thr)
+          WRITE(*,*) 'Union area', count( MIN(Zud, Zflow_mask) > 0 ) * cell**2
+          WRITE(*,*) 'Intersection area', count( MAX(Zud, Zflow_mask) > 0 ) * cell**2
+          WRITE(*,*) 'Fitting parameter', fitting_parameter
+          
+       END IF
+              
     END DO
 
-    IF ( union_diff_flag ) DEALLOCATE( Zout_2D )       
-       
     RETURN
 
   END SUBROUTINE write_masking
 
+  SUBROUTINE init_union_diff
+
+    USE flow, ONLY : Zflow, Zud
+
+    IMPLICIT NONE
+
+    REAL(wp) :: lx_ud, ly_ud
+    INTEGER :: cols_ud, rows_ud
+    REAL(wp) :: cell_ud
+    REAL(wp) :: nd_ud
+    REAL(wp), ALLOCATABLE :: xin_1D(:), yin_1D(:), Zs_ud(:,:), Zout_2D(:,:)
+
+    REAL(wp) :: Zs_temp(ny,nx)
+
+    INTEGER :: i, max_lobes
+
+    max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
+
+    CALL read_asc(union_diff_file,Zs_ud, lx_ud, ly_ud, cols_ud, rows_ud, cell_ud, nd_ud)
+
+    ! WRITE(*,*) lx_ud, ly_ud, cols_ud, rows_ud, cell_ud
+    ! WRITE(*,*) lx, ly, size(Zflow,2), size(Zflow,1), cell
+
+    IF ( ( cols_ud .NE. size(Zflow,2)) .OR. (rows_ud .NE. size(Zflow,1)) .OR.&
+         ( ABS(lx_ud-lx)>=eps ) .OR. ( ABS(ly_ud-ly)>=eps ) .OR. ( ABS(cell_ud-cell)>=eps ) ) THEN
+
+       WRITE(*,*) "Union_diff_file", union_diff_file
+       WRITE(*,*) "Different header: interpolating data"
+
+       ALLOCATE( xin_1D(cols_ud) , yin_1D(rows_ud) )
+
+       ! Calculate cell centers
+       do i = 1, cols_ud
+          xin_1D(i) = lx_ud + cell_ud * (0.5 + (i - 1))
+       end do
+       do i = 1, rows_ud
+          yin_1D(i) = ly_ud + cell_ud * (0.5 + (i - 1))
+       end do
+
+       CALL interp2Dgrids(xin_1D, yin_1D, Zs_ud, Xtopo, Ytopo, Zout_2D)
+
+       DEALLOCATE( xin_1D , yin_1D )
+       DEALLOCATE( Zs_ud )
+       Zud = Zout_2D
+       DEALLOCATE( Zout_2D )       
+
+    ELSE
+
+       Zud = Zs_ud 
+
+    END IF
+
+    RETURN
+
+  END SUBROUTINE init_union_diff
+
+    
   SUBROUTINE read_asc(asc_file,asc_array, x0, y0, cols, rows, cell_size, nodata)
 
     IMPLICIT NONE
