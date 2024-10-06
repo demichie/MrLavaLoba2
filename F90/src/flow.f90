@@ -314,25 +314,14 @@ CONTAINS
 
           CALL step2(slope, max_slope_angle, angle(i))
 
-          !angle(i) = 317.8996889005825_wp
-          !WRITE(*,*) 'angle(i)',angle(i)
-          
           CALL compute_semiaxis(slope,x1(i), x2(i))
           
           CALL rasterize(x(i), y(i), x1(i), x2(i), angle(i), dist_int(i),       &
                i_West, i_East, j_South, j_North, Zflow_local, Dist_local,       &
                Zflow_local_int)
 
-          !write(*,*) Zflow_local
-
-
-          !read(*,*)
-          
           ! compute the thickness of the lobe
           lobe_thickness = thickness_min + (i - 1) * delta_lobe_thickness
-
-          ! WRITE(*,*) 'lobe_thickness',lobe_thickness
-          ! READ(*,*)
 
           nx_local = i_East - i_West
           ny_local = j_North - j_South
@@ -361,9 +350,6 @@ CONTAINS
 
        DO i = n_init+1,n_lobes
 
-          ! WRITE(*,*) 'i,x,y',i,x(i-1),y(i-1)
-          ! READ(*,*)
-
           IF (n_flows==1) THEN
 
              WRITE(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") ACHAR(13),              &
@@ -375,8 +361,6 @@ CONTAINS
           IF ( (lobe_exponent - 0.0_wp) > eps ) THEN
 
              CALL step0(i, dist_int(1:i), idx)
-             !WRITE(*,*) 'idx',idx
-             !READ(*,*)
 
           ELSE
 
@@ -411,33 +395,16 @@ CONTAINS
           
           CALL step1(xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx),          &
                angle(idx), slope, max_slope_angle, zidx)
-
-          !WRITE(*,*) 'xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx)',xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx)
-          !WRITE(*,*) 'angle(idx), slope, max_slope_angle, zidx',angle(idx), slope, max_slope_angle, zidx
-
-          ! WRITE(*,*) 'max_slope_angle',max_slope_angle
           
           CALL step2(slope, max_slope_angle, temp_angle)
 
-          ! WRITE(*,*) 'temp_angle',temp_angle
-          !WRITE(*,*) 'slope,atan(slope)',slope,atan(slope)
-          !READ(*,*)
-          
           CALL step3(angle(idx),  temp_angle, slope, cos_angle1, sin_angle1,    &
                new_angle)
 
-          !new_angle = 313.00116002201054_wp  
-          !WRITE(*,*) 'new_angle',new_angle
-          
           CALL step4and5(new_angle, angle(idx), x1(idx), x2(idx), x(idx),       &
                y(idx), zidx, cos_angle1, sin_angle1, check_step, x(i), y(i),    &
                x1(i), x2(i), angle(i))
-
-          x(i) = nint( x(i) * 100.0_wp) / 100.0_wp
-          y(i) = nint( y(i) * 100.0_wp) / 100.0_wp
           
-          !WRITE(*,*) 'x(i), y(i)',x(i), y(i)
-
           IF (.NOT.check_step) THEN
 
              last_lobe = i-1
@@ -452,17 +419,8 @@ CONTAINS
           nx_local = i_East - i_West
           ny_local = j_North - j_South
 
-          !WRITE(*,*) 'i_West, i_East, j_South, j_North',i_West, i_East, j_South, j_North
-          !WRITE(*,*) 'max_cells',max_cells
-          !WRITE(*,*) 'Zflow_local'
-          !WRITE(*,*) Zflow_local(1:ny_local,1:nx_local)
-          
-          
           ! compute the thickness of the lobe
           lobe_thickness = thickness_min + (i - 1) * delta_lobe_thickness
-
-          ! WRITE(*,*) 'lobe_thickness ', lobe_thickness
-
 
           ! update the thickness of the flow with the new lobe
           Zflow(j_South:j_North-1, i_West:i_East-1) =                           &
@@ -475,11 +433,6 @@ CONTAINS
                + filling_parameter(j_South:j_North-1, i_West:i_East-1)          &
                * lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
 
-          !WRITE(*,*) 'Ztot'
-          !DO j=j_South,j_North-1
-          !   WRITE(*,*) Ztot(j, i_West:i_East-1)
-          !END DO
-             
           ! store the bounding box of the new lobe
           jNorth_array(i) = j_North
           jSouth_array(i) = j_South
@@ -642,8 +595,6 @@ CONTAINS
           den = cum_fiss_length(idx_vent) - cum_fiss_length(idx_vent - 1)
           alfa_segment = num / den
 
-          ! WRITE(*,*) 'idx_vent,alfa_segment',idx_vent,alfa_segment
-
           x_i = alfa_segment * x_vent(idx_vent) + &
                (1.0 - alfa_segment) * x_vent(idx_vent - 1)
 
@@ -713,8 +664,6 @@ CONTAINS
 
     end if
 
-    ! WRITE(*,*) 'x_i,y_i ',x_i,y_i
-
     RETURN
 
   end subroutine first_lobe
@@ -740,10 +689,6 @@ CONTAINS
     call coorToIdx(x_i, xcmin, inv_cell, ix, xi)
     call coorToIdx(y_i, ycmin, inv_cell, iy, yi)
 
-    !WRITE(*,*) x_i, xcmin, inv_cell,ix, xi
-    !WRITE(*,*) y_i, ycmin, inv_cell,iy, yi
-    !READ(*,*)
-    
     ! Calculate baricentric coordinates (fraction within the cell)
     xi_fract = xi - real(ix) + 1.0_wp
     yi_fract = yi - real(iy) + 1.0_wp
@@ -758,19 +703,14 @@ CONTAINS
     Fy_test = (xi_fract * (Ztot(iy1, ix1) - Ztot(iy, ix1)) +                    &
          (1.0_wp - xi_fract) * (Ztot(iy1, ix) - Ztot(iy, ix))) * inv_cell
 
-    !WRITE(*,*) 'yi_fract',yi_fract
-    !WRITE(*,*) Ztot(iy1, ix1),  Ztot(iy1, ix), Ztot(iy, ix1), Ztot(iy, ix)
-    !WRITE(*,*) 'Fx_test,Fy_test',Fx_test,Fy_test
-    
     ! Calculate the maximum slope angle (in degrees)
     max_slope_angle = mod(180.0_wp + atan2d(Fy_test, Fx_test), 360.0_wp)
 
     ! Calculate the slope at the lobe center
     slope = sqrt(Fx_test**2 + Fy_test**2)
 
-    !WRITE(*,*) " max_slope_angle, slope ", max_slope_angle, slope
-    !READ(*,*)
-
+    RETURN
+    
   end subroutine step1A
 
   subroutine compute_semiaxis(slope,new_x1, new_x2)
@@ -800,8 +740,6 @@ CONTAINS
     num = sqrt(lobe_area / pi)
     new_x1 = num * sqrt_aspect_ratio
     new_x2 = num / sqrt_aspect_ratio
-
-    ! WRITE(*,*) "new_x1, new_x2 ",new_x1, new_x2
 
     RETURN
 
@@ -853,9 +791,6 @@ CONTAINS
     min_ye = minval(ye)
     max_ye = maxval(ye)
 
-    !WRITE(*,*) 'min_xe, max_xe, min_ye, max_ye',min_xe, max_xe, min_ye, max_ye
-    ! WRITE(*,*) 'lx, ly', lx, ly
-
     ! Compute the bounding box indices for the grid
     call coorToIdx(min_xe, xcmin, inv_cell, idx_west, xi)
     i_West = max(1, min(nx, idx_west))
@@ -869,11 +804,8 @@ CONTAINS
     call coorToIdx(max_ye, ycmin, inv_cell, idx_north, yi)
     j_North = max(1, min(ny, idx_north+2 ))
 
-    ! WRITE(*,*) 'i_West, i_East, j_South, j_North',i_West, i_East, j_South, j_North
-    ! WRITE(*,*) Xtopo(j_South,i_West)-0.5_wp*cell, Xtopo(j_North,i_East)+0.5_wp*cell
-    ! WRITE(*,*) Ytopo(j_South,i_West)-0.5_wp*cell, Ytopo(j_North,i_East)+0.5_wp*cell
-    ! READ(*,*)
-
+    RETURN
+    
   end subroutine bounding_box
 
 
@@ -1031,9 +963,6 @@ CONTAINS
     ! Compute the points of the lobe
     CALL ellipse(x_i, y_i, x1_i, x2_i, angle_i, xe, ye)
 
-    !WRITE(*,*) 'x_i, y_i, x1_i, x2_i, angle_i',x_i, y_i, x1_i, x2_i, angle_i
-    !READ(*,*)
-    
     ! Compute the bounding box for the new lobe
     CALL bounding_box(xe, ye, i_West, i_East, j_South, j_North)
 
@@ -1178,12 +1107,6 @@ CONTAINS
 
     END DO
 
-    !WRITE(*,*) 'xe',xe
-    !WRITE(*,*) 'ye',ye
-    !WRITE(*,*) 'ze',ze
-    !READ(*,*)
-
-    
     ! Find the point on the ellipse with minimum elevation
     idx_min = minloc(ze,DIM=1)
 
@@ -1223,8 +1146,6 @@ CONTAINS
 
        ! Convert slope to degrees
        slopedeg = atand(slope)
-
-       !WRITE(*,*) 'slopedeg',slopedeg
 
        IF (slopedeg > 0.0_wp .and. max_slope_prob > 0.0_wp) THEN
 
@@ -1400,14 +1321,9 @@ CONTAINS
        ! Calculate the slope
        slope = max(0.0_wp, (zidx - ze) / sqrt(delta_x**2 + delta_y**2))
 
-       !WRITE(*,*) 'zidx,ze',zidx,ze
-       !WRITE(*,*) 'slope',slope
-       
        ! Compute the semi-axes of the new lobe
        CALL compute_semiaxis(slope,new_x1, new_x2)
 
-       !WRITE(*,*) 'slope,new_x1',slope,new_x1
-       
        ! Calculate v1 and v2
        v1 = sqrt(delta_x**2 + delta_y**2)
        v2 = v1 + new_x1
@@ -1415,9 +1331,6 @@ CONTAINS
        ! Calculate v
        v = (v1 * (1.0_wp - dist_fact) + v2 * dist_fact) / v1
 
-       !WRITE(*,*) 'v1,v2',v1,v2
-       !WRITE(*,*) 'v,delta_x,delta_y',v,delta_x,delta_y
-       
        ! Compute the new lobe center coordinates
        x_new = x_idx + v * delta_x
        y_new = y_idx + v * delta_y
