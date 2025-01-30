@@ -383,6 +383,12 @@ CONTAINS
                (iy <= 0.5 * max_cells) .OR. (iy1 >= (ny - 0.5*max_cells)) .OR.  &
                (abs(Ztopo(iy, ix)-nd)<=eps) .OR. (abs(Ztopo(iy1, ix1)-nd)<=eps) .OR.          &
                (abs(Ztopo(iy, ix1)-nd)<=eps) .OR. (ABS(Ztopo(iy1, ix)-nd)<=eps) ) THEN
+             
+             WRITE(*,*) 'ERROR : the lava has reached the DEM margin'
+             IF (ix <= 0.5 * max_cells) WRITE(*,*) 'Please increase west_to_vent'
+             IF (ix1 >= (nx - 0.5*max_cells)) WRITE(*,*) 'Please increase east_to_vent'
+             IF (iy <= 0.5 * max_cells) WRITE(*,*) 'Please increase south_to_vent'
+             IF (iy1 >= (ny - 0.5*max_cells)) WRITE(*,*) 'Please increase north_to_vent'
 
              last_lobe = i - 1
 
@@ -1289,6 +1295,12 @@ CONTAINS
     if (ix <= 0.5_wp * max_cells .or. ix1 >= nx - 0.5_wp * max_cells .or.       &
          iy <= 0.5_wp * max_cells .or. iy1 >= ny - 0.5_wp * max_cells) then
 
+       WRITE(*,*) 'ERROR : the lava has reached the DEM margin'
+       IF (ix <= 0.5 * max_cells) WRITE(*,*) 'Please increase west_to_vent'
+       IF (ix1 >= (nx - 0.5*max_cells)) WRITE(*,*) 'Please increase east_to_vent'
+       IF (iy <= 0.5 * max_cells) WRITE(*,*) 'Please increase south_to_vent'
+       IF (iy1 >= (ny - 0.5*max_cells)) WRITE(*,*) 'Please increase north_to_vent'
+       
        check_step = .FALSE.
        x_new = 0.0_wp
        y_new = 0.0_wp

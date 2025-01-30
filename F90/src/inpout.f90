@@ -83,7 +83,7 @@ CONTAINS
     IMPLICIT none
 
     nc_flag = .FALSE.
-    asc_flag = .FALSE.
+    asc_flag = .TRUE.
 
     vent_flag = -1
 
