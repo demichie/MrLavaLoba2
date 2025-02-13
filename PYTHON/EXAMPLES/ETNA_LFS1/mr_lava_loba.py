@@ -2262,10 +2262,10 @@ try:
     # Parse the header using a loop and
     # the built-in linecache module
     hdr = [getline(union_diff_file, i) for i in range(1, 7)]
-    header = [float(h.split(" ")[-1].strip()) for h in hdr]
+    header_ud = [float(h.split(" ")[-1].strip()) for h in hdr]
     Zs_temp = np.flipud(np.loadtxt(union_diff_file, skiprows=6))
 
-    cols_ud, rows_ud, lx_ud, ly_ud, cell_ud, nd_ud = header
+    cols_ud, rows_ud, lx_ud, ly_ud, cell_ud, nd_ud = header_ud
     if (cols_ud != Zflow.shape[1]) or (rows_ud != Zflow.shape[0]) or (
             lx_ud != lx) or (ly_ud != ly) or (cell_ud != cell):
 
