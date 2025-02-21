@@ -2329,16 +2329,17 @@ try:
     print('Thickness relative error', rel_err_vol)
     print('--------------------------------')
 
-    output_ud = run_name + '_ud.txt'
+    output_ud = run_name + '_ud.csv'
+    
     with open(output_ud, 'a') as ud_file:
 
-        ud_file.write('--------------------------------'+'\n')
-        ud_file.write('With full output \n')
-        ud_file.write('Union area '+ str(area_union) + ' Intersect. area' + str(area_inters)  + '\n')
-        ud_file.write('Fitting parameter ' + str(fitting_parameter) + '\n')
-        ud_file.write('Vol 1 in intersect. ' + str(Zs1_vol) + ' Vol 2 in intersect. '
-              + str(Zs2_vol) + '\n')
-        ud_file.write('Thickness relative error ' + str(rel_err_vol) + '\n')
+        ud_file.write('Masking,Union Area, Intersection Area, Fitting Parameter, '
+                +'Vol1 in intersection, Vol2 in intersection, Thickness relative error'+'\n')
+        ud_file.write(str(1.0)  + ' , ')
+        ud_file.write(str(area_union) + ' , ' + str(area_inters) + ' , ')  
+        ud_file.write(str(fitting_parameter)  + ' , ')
+        ud_file.write(str(Zs1_vol)  + ' , ' + str(Zs2_vol)  + ' , ')
+        ud_file.write(str(rel_err_vol) + '\n')
 
 
 except ImportError:
@@ -2492,13 +2493,11 @@ for i_thr in range(n_masking):
 
             with open(output_ud, 'a') as ud_file:
 
-                ud_file.write('--------------------------------'+'\n')
-                ud_file.write('With masking threshold ' +  str(masking_threshold[i_thr]) + '\n')
-                ud_file.write('Union area '+ str(area_union) + ' Intersect. area' + str(area_inters)  + '\n')
-                ud_file.write('Fitting parameter ' + str(fitting_parameter) + '\n')
-                ud_file.write('Vol 1 in intersect. ' + str(Zs1_vol) + ' Vol 2 in intersect. '
-                      + str(Zs2_vol) + '\n')
-                ud_file.write('Thickness relative error ' + str(rel_err_vol))
+                ud_file.write(str(masking_threshold[i_thr])  + ' , ')
+                ud_file.write(str(area_union) + ' , ' + str(area_inters) + ' , ')  
+                ud_file.write(str(fitting_parameter)  + ' , ')
+                ud_file.write(str(Zs1_vol)  + ' , ' + str(Zs2_vol)  + ' , ')
+                ud_file.write(str(rel_err_vol) + '\n')
 
 
 output_dist = run_name + '_dist_full.asc'
