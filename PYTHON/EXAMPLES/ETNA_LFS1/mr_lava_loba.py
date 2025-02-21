@@ -1224,7 +1224,7 @@ def step0(lobe_exponent, i, force_max_length, distInt, start_from_dist_flag):
     return idx
 
 
-@njit(fastmath=True)
+# @njit(fastmath=True)
 def interp2Dgrids(xin, yin, Zin, Xout, Yout):
     """
     Interpolation from a regular grid to a second regular grid
@@ -1262,10 +1262,8 @@ def interp2Dgrids(xin, yin, Zin, Xout, Yout):
     xi = (xout - xinMin) / cellin
     yi = (yout - yinMin) / cellin
 
-    # Indexes of the lower-left corner of the cell containing the center of
-    # the parent lobe
-    ix = np.maximum(0, np.minimum(xin.shape[0] - 2, np.floor(xi).astype(int)))
-    iy = np.maximum(0, np.minimum(yin.shape[0] - 2, np.floor(yi).astype(int)))
+    ix = np.maximum(0, np.minimum(xin.shape[0] - 2, np.int64(np.floor(xi))))
+    iy = np.maximum(0, np.minimum(yin.shape[0] - 2, np.int64(np.floor(yi))))
 
     # Indexes of the top-right corner of the cell containing the center of
     # the parent lobe
@@ -1885,7 +1883,7 @@ for flow in range(0, n_flows):
         # DEFINE THE NUMBER OF LOBES OF THE FLOW (RANDOM VALUE BETWEEN
         # MIN AND MAX)
         n_lobes = int(
-            np.ceil(np.random.uniform(min_n_lobes, max_n_lobes, size=1)))
+            np.ceil(np.random.uniform(min_n_lobes, max_n_lobes, size=None)))
 
     else:
 
@@ -2331,6 +2329,18 @@ try:
     print('Thickness relative error', rel_err_vol)
     print('--------------------------------')
 
+    output_ud = run_name + '_ud.txt'
+    with open(output_ud, 'a') as ud_file:
+
+        ud_file.write('--------------------------------'+'\n')
+        ud_file.write('With full output \n')
+        ud_file.write('Union area '+ str(area_union) + ' Intersect. area' + str(area_inters)  + '\n')
+        ud_file.write('Fitting parameter ' + str(fitting_parameter) + '\n')
+        ud_file.write('Vol 1 in intersect. ' + str(Zs1_vol) + ' Vol 2 in intersect. '
+              + str(Zs2_vol) + '\n')
+        ud_file.write('Thickness relative error ' + str(rel_err_vol) + '\n')
+
+
 except ImportError:
 
     print("Union_diff_file not defined")
@@ -2341,6 +2351,7 @@ if isinstance(masking_threshold, float):
     masking_threshold = [masking_threshold]
 
 n_masking = len(masking_threshold)
+
 
 for i_thr in range(n_masking):
 
@@ -2478,6 +2489,17 @@ for i_thr in range(n_masking):
 
             print('Thickness relative error', rel_err_vol)
             print('--------------------------------')
+
+            with open(output_ud, 'a') as ud_file:
+
+                ud_file.write('--------------------------------'+'\n')
+                ud_file.write('With masking threshold ' +  str(masking_threshold[i_thr]) + '\n')
+                ud_file.write('Union area '+ str(area_union) + ' Intersect. area' + str(area_inters)  + '\n')
+                ud_file.write('Fitting parameter ' + str(fitting_parameter) + '\n')
+                ud_file.write('Vol 1 in intersect. ' + str(Zs1_vol) + ' Vol 2 in intersect. '
+                      + str(Zs2_vol) + '\n')
+                ud_file.write('Thickness relative error ' + str(rel_err_vol))
+
 
 output_dist = run_name + '_dist_full.asc'
 
