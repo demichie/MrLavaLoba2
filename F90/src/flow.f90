@@ -257,7 +257,7 @@ CONTAINS
 
        Zflow_local_array = 0.0_wp
 
-       if (a_beta .LE. 0.0_wp .and. b_beta .LE. 0.0_wp) then
+       if (a_beta .LE. 0.0_wp .AND. b_beta .LE. 0.0_wp) then
 
           ! Generate a random value uniformly distributed between min_n_lobes
           ! and max_n_lobes

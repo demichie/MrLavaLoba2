@@ -23,6 +23,7 @@ PROGRAM mr_lava_loba
   USE flow, ONLY : allocate_flow, init_fissure, flow_loop
   USE inpout, ONLY : init_param, read_param, read_topo, write_asc
   USE inpout, ONLY : write_masking, write_netcdf_2d, init_union_diff
+  USE inpout, ONLY : eval_union_diff
   USE parameters, ONLY : init_run
   USE inpout, ONLY : nc_flag, asc_flag
   
@@ -86,6 +87,12 @@ PROGRAM mr_lava_loba
 
   END IF
 
+  IF (union_diff_flag) THEN
+          
+     CALL eval_union_diff(Zflow, 1.0_wp)
+          
+  END IF
+  
   CALL write_masking
 
   

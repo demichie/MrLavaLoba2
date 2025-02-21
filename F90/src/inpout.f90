@@ -648,7 +648,7 @@ CONTAINS
 
   SUBROUTINE write_masking
 
-    USE flow, ONLY : Zflow, Zflow_mask, Zud
+    USE flow, ONLY : Zflow, Zflow_mask
 
     IMPLICIT NONE
 
@@ -659,7 +659,7 @@ CONTAINS
     REAL(wp) :: threshold
     REAL(wp) :: volume_fraction
     CHARACTER(LEN=40) :: masked_file, masking_str1, masking_str2
-    REAL(wp) :: fitting_parameter
+    REAL(wp) :: masked_area
 
     max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
 
@@ -672,8 +672,9 @@ CONTAINS
 
           threshold = i * 0.1_wp * avg_lobe_thickness
 
-          Zflow_mask = Zflow * merge(1.0_wp,0.0_wp,Zflow.GT.threshold)
-          total_masked_Zflow = sum(Zflow_mask)
+          Zflow_mask = Zflow * MERGE(1.0_wp, 0.0_wp, Zflow.GT.threshold)
+          masked_area = cell**2 * SUM(MERGE(1.0_wp, 0.0_wp, Zflow.GT.threshold))
+          total_masked_Zflow = SUM(Zflow_mask)
 
           volume_fraction = total_masked_Zflow / total_Zflow
 
@@ -681,18 +682,18 @@ CONTAINS
 
              WRITE(*,*)
              WRITE(*,*) 'Masking threshold', masking_threshold(i_thr)
-             WRITE(*,*) 'Total volume (m3) =', cell**2 * total_Zflow,                  &
-                  'Masked volume (m3) =', cell**2 * total_masked_Zflow,            &
+             WRITE(*,*) 'Total volume (m3) =', cell**2 * total_Zflow,           &
+                  'Masked volume (m3) =', cell**2 * total_masked_Zflow,         &
                   'Volume fraction =', volume_fraction
 
-             !WRITE(*,*) 'Total area', cell**2 * sum(merge(0,1,Zflow > 0)),      &
-             !     ' m2 Masked area',cell**2 * sum(merge(0,1,masked_Zflow > 0)), &
-             !     ' m2'
+             WRITE(*,*) 'Total area', cell**2 * sum(merge(0,1,Zflow > 0.0_wp)), &
+                  ' m2 Masked area',masked_area, &
+                  ' m2'
 
-             !WRITE(*,*) 'Average thickness full',                               &
-             !     total_Zflow / sum(merge(0,1,Zflow > 0)),                      &
-             !     ' m Average thickness mask', sum(masked_Zflow) /              &
-             !     sum(merge(0,1,masked_Zflow > 0)), ' m'
+             WRITE(*,*) 'Average thickness full',                               &
+                  total_Zflow / sum(merge(0,1,Zflow.GT.0.0_wp)),                &
+                  ' m Average thickness mask', sum(Zflow*Zflow_mask) /          &
+                  masked_area, ' m'
 
              ! Convert the masking_threshold value to a string and replace '.' with '_'
              write(masking_str1, '(F6.2)') masking_threshold(i_thr)
@@ -725,14 +726,7 @@ CONTAINS
 
        IF (union_diff_flag) THEN
           
-          fitting_parameter = REAL(count( MIN(Zud, Zflow_mask) > 0 )) /    &
-               REAL(count( MAX(Zud, Zflow_mask) > 0 ))
-          
-          WRITE(*,*) '--------------------------------'
-          WRITE(*,*) 'With masking threshold', masking_threshold(i_thr)
-          WRITE(*,*) 'Union area', count( MIN(Zud, Zflow_mask) > 0 ) * cell**2
-          WRITE(*,*) 'Intersection area', count( MAX(Zud, Zflow_mask) > 0 ) * cell**2
-          WRITE(*,*) 'Fitting parameter', fitting_parameter
+          CALL eval_union_diff(Zflow_mask, masking_threshold(i_thr))
           
        END IF
               
@@ -796,6 +790,53 @@ CONTAINS
 
   END SUBROUTINE init_union_diff
 
+  SUBROUTINE eval_union_diff(Z_check,thr_value)
+
+    USE flow, ONLY : Zud, Zflow
+    
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: Z_check(:,:)
+    REAL(wp), INTENT(IN) :: thr_value
+    
+    REAL(wp) :: area_union, area_inters
+    REAL(wp) :: fitting_parameter
+    REAL(wp) :: Zud_vol, Zcheck_vol, vol_diff
+    REAL(wp) :: total_masked_Zflow
+    REAL(wp) :: rel_err_vol
+    
+    area_union = cell**2 * REAL(count( MAX(Zud, Z_check) > 0 ))
+    area_inters = cell**2 * REAL(count( MIN(Zud, Z_check) > 0 ))
+
+    fitting_parameter = area_inters / area_union
+          
+    WRITE(*,*) ''
+    WRITE(*,*) 'With masking threshold', thr_value
+    WRITE(*,*) 'Union area', area_union, 'm2'
+    WRITE(*,*) 'Intersection area', area_inters, 'm2'
+    WRITE(*,*) 'Fitting parameter', fitting_parameter
+    
+    Zud_vol = cell**2 * SUM(Zud *                                          &
+         MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
+    
+    Zcheck_vol = cell**2 * SUM(Z_check *                            &
+         MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
+    
+    vol_diff = cell**2 * SUM(ABS(Zud-Z_check) *                         &
+         MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
+    
+    WRITE(*,*) 'Volume 1 in intersection', Zud_vol,                       &
+         'm3 Volume 2 in intersection', Zcheck_vol, 'm3'
+    
+    total_masked_Zflow = sum(Zflow*Z_check)
+    
+    rel_err_vol = vol_diff / MAX(Zud_vol, Zcheck_vol)
+    
+    WRITE(*,*) 'Thickness relative error', rel_err_vol
+    WRITE(*,*) '--------------------------------'
+
+  END SUBROUTINE eval_union_diff
+  
     
   SUBROUTINE read_asc(asc_file,asc_array, x0, y0, cols, rows, cell_size, nodata)
 
