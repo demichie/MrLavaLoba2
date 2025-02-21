@@ -1,6 +1,7 @@
 To compile the code you need a Fortran compiler and the NetCDF library for Fortran. You can install both with anaconda:
 
 conda install conda-forge::gfortran
+
 conda install conda-forge::netcdf-fortran
 
 To compile the code, first edit the Makefile file in the src folder, and change the path of the NETCDF library according to where is installed on your computer.
