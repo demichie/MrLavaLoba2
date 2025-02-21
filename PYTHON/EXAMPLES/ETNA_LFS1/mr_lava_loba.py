@@ -42,7 +42,7 @@ from linecache import getline
 import numpy as np
 from input_data_advanced import n_check_loop
 from numba import njit
-import numba   
+import numba
 
 
 def initialize_topo(source):
@@ -786,7 +786,7 @@ def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
         second semiaxis of new lobe    
     new_angle: float
         orientation angle of new lobe
-    
+
     """
 
     # a define the ang.coeff. of the line defining the location of the
@@ -863,7 +863,7 @@ def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
         # the same volume for all the lobes.
         new_x1, new_x2 = compute_semiaxis(slope, max_aspect_ratio,
                                           aspect_ratio_coeff, lobe_area)
-        
+
         # v1 is the distance of the new point found on the boundary of the lobe
         # from the center of the lobe
         v1 = np.sqrt(delta_x**2 + delta_y**2)
@@ -1306,7 +1306,6 @@ def ellipse(xc, yc, ax1, ax2, angle, X_circle, Y_circle):
 @njit(fastmath=True)
 def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
                        nv2):
-
     """ this function, given and ellipse and a grid of square cells, return 
         a 2d array with the intersections of the ellipse and cells, in terms of
         fraction of cell covered by the ellipse. the accuracy of this procedure
@@ -1344,7 +1343,6 @@ def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
          intersections of ellipse and cells
     """
 
-
     nx_cell = Xc_local.shape[0]
     ny_cell = Xc_local.shape[1]
 
@@ -1374,7 +1372,7 @@ def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
     term6 = c1xv_p_s1yv**2 + c2yv_m_s2yv**2
 
     term124 = term1 + term2 + term4
-    
+
     term356 = term3 + term5 + term6
 
     term_tot = term124 + term356.transpose()
@@ -1516,7 +1514,7 @@ def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
 
             x_i = x_vent[int(i_vent)]
             y_i = y_vent[int(i_vent)]
-           
+
         x_i = x_i.item()
         y_i = y_i.item()
 
@@ -1616,8 +1614,6 @@ if force_max_length:
 else:
 
     max_length = 0
-
-
 
 # search if another run with the same base name already exists
 i = 0
@@ -1961,8 +1957,9 @@ for flow in range(0, n_flows):
             filling_parameter[j_South:j_North, i_West:i_East] * \
             lobe_thickness * Zflow_local
 
-        Dist[j_South:j_North, i_West:i_East] = np.minimum(
-            Dist[j_South:j_North, i_West:i_East], Dist_local)
+        Dist[j_South:j_North,
+             i_West:i_East] = np.minimum(Dist[j_South:j_North, i_West:i_East],
+                                         Dist_local)
 
         # store the bounding box of the new lobe
         jNorth_array[i] = j_North
@@ -2045,12 +2042,12 @@ for flow in range(0, n_flows):
                                              xcmin, ycmin, cell, Ztot, x1[idx],
                                              x2[idx], angle[idx], X_circle,
                                              Y_circle)
-        
+
         old_angle = step2(max_slope_prob, slope, max_slope_angle)
 
         cos_angle1, sin_angle1, new_angle = step3(angle[idx], deg2rad,
                                                   old_angle, inertial_exponent)
-        
+
         if (alfa_channel > 0.0):
 
             new_angle = channel_mod_angle(new_angle)
@@ -2058,7 +2055,7 @@ for flow in range(0, n_flows):
         out_step4 = step4and5(deg2rad, new_angle, angle[idx], x1[idx], x2[idx],
                               x[idx], y[idx], zidx, max_cells, lobe_area,
                               max_aspect_ratio, aspect_ratio_coeff, dist_fact,
-                              cos_angle1, sin_angle1, xcmin, ycmin, Ztot, nx, 
+                              cos_angle1, sin_angle1, xcmin, ycmin, Ztot, nx,
                               ny)
 
         if out_step4[0] is None:
@@ -2082,8 +2079,9 @@ for flow in range(0, n_flows):
                                         cell, nx, ny, Xc, Yc, xv, yv, nv2)
 
         # update the minimum distance in the global indexing
-        Dist[j_South:j_North, i_West:i_East] = np.minimum(
-            Dist[j_South:j_North, i_West:i_East], Dist_local)
+        Dist[j_South:j_North,
+             i_West:i_East] = np.minimum(Dist[j_South:j_North, i_West:i_East],
+                                         Dist_local)
 
         # compute the thickness of the lobe
         lobe_thickness = thickness_min + (i - 1) * delta_lobe_thickness
@@ -2178,15 +2176,15 @@ for flow in range(0, n_flows):
                     print('j', j_South, j_North)
                     print('i', i_West, i_East)
                     print('idx parent', parent[i])
-                    print('j', jSouth_array[parent[i]], jNorth_array[parent[i]])
+                    print('j', jSouth_array[parent[i]],
+                          jNorth_array[parent[i]])
                     print('i', iWest_array[parent[i]], iEast_array[parent[i]])
                     print(j_South_int, j_North_int, i_West_int, i_East_int)
 
                 Zlocal_new[
                     np.maximum(0, j_South_int -
                                j_South):np.minimum(j_North_int -
-                                                    j_South, j_North -
-                                                    j_South),
+                                                   j_South, j_North - j_South),
                     np.maximum(i_West_int -
                                i_West, 0):np.minimum(i_East_int -
                                                      i_West, i_East -
@@ -2290,16 +2288,12 @@ try:
     Zs2 = Zflow
 
     Zs_union = np.maximum(Zs1, Zs2)
-
-    Zs_union = Zs_union / np.maximum(Zs_union, 1)
-    area_union = np.sum(Zs_union) * cell**2
-
     Zs_inters = np.minimum(Zs1, Zs2)
 
-    Zs_inters = Zs_inters / np.maximum(Zs_inters, 1)
-    area_inters = np.sum(Zs_inters) * cell**2
+    area_union = np.count_nonzero(Zs_union) * cell**2
 
-    # area_inters = np.count_nonzero(Zs_inters) * cell**2
+    area_inters = np.count_nonzero(Zs_inters) * cell**2
+
     fitting_parameter = area_inters / area_union
 
     print('--------------------------------')
@@ -2307,22 +2301,15 @@ try:
     print('Union area', area_union, 'Intersect. area', area_inters)
     print('Fitting parameter', fitting_parameter)
 
-    Zs1_mean = np.mean(Zs1 * Zs_inters) * nx * ny / np.count_nonzero(Zs_inters)
-    Zs2_mean = np.mean(Zs2 * Zs_inters) * nx * ny / np.count_nonzero(Zs_inters)
+    Zs1_vol = np.sum(Zs1 * (np.minimum(Zs1, Zs2) > 0)) * cell**2
+    Zs2_vol = np.sum(Zs2 * (np.minimum(Zs1, Zs2) > 0)) * cell**2
 
-    Zs1_vol = Zs1_mean * area_inters
-    Zs2_vol = Zs2_mean * area_inters
+    print('Vol 1 in intersect.', Zs1_vol, 'Vol 2 in intersect.', Zs2_vol)
 
-    print('Volume 1 in intersection', Zs1_vol, 'Volume 2 in intersection',
-          Zs2_vol)
+    Zs_diff = np.abs(Zs1 - Zs2) * (np.minimum(Zs1, Zs2) > 0)
 
-    Zs_diff = np.abs(Zs1 - Zs2)
-
-    Zs_diff = Zs_diff * Zs_inters
-
-    avg_thick_diff = np.mean(Zs_diff) * nx * ny / np.count_nonzero(Zs_inters)
-    std_thick_diff = np.std(Zs_diff) * nx * ny / np.count_nonzero(Zs_inters)
-    vol_diff = avg_thick_diff * area_inters
+    vol_diff = np.sum(Zs_diff) * cell**2
+    print('Vol_diff', vol_diff)
 
     rel_err_vol = vol_diff / np.maximum(Zs1_vol, Zs2_vol)
 
@@ -2330,17 +2317,18 @@ try:
     print('--------------------------------')
 
     output_ud = run_name + '_ud.csv'
-    
+
     with open(output_ud, 'a') as ud_file:
 
-        ud_file.write('Masking,Union Area, Intersection Area, Fitting Parameter, '
-                +'Vol1 in intersection, Vol2 in intersection, Thickness relative error'+'\n')
-        ud_file.write(str(1.0)  + ' , ')
-        ud_file.write(str(area_union) + ' , ' + str(area_inters) + ' , ')  
-        ud_file.write(str(fitting_parameter)  + ' , ')
-        ud_file.write(str(Zs1_vol)  + ' , ' + str(Zs2_vol)  + ' , ')
+        ud_file.write(
+            'Masking,Union Area, Intersection Area, Fitting Parameter, ' +
+            'Vol1 in intersection, Vol2 in intersection, Thickness relative error'
+            + '\n')
+        ud_file.write(str(1.0) + ' , ')
+        ud_file.write(str(area_union) + ' , ' + str(area_inters) + ' , ')
+        ud_file.write(str(fitting_parameter) + ' , ')
+        ud_file.write(str(Zs1_vol) + ' , ' + str(Zs2_vol) + ' , ')
         ud_file.write(str(rel_err_vol) + '\n')
-
 
 except ImportError:
 
@@ -2352,7 +2340,6 @@ if isinstance(masking_threshold, float):
     masking_threshold = [masking_threshold]
 
 n_masking = len(masking_threshold)
-
 
 for i_thr in range(n_masking):
 
@@ -2446,18 +2433,12 @@ for i_thr in range(n_masking):
 
             Zs2 = (1 - masked_Zflow.mask) * Zflow
             Zs_union = np.maximum(Zs1, Zs2)
-
-            Zs_union = Zs_union / np.maximum(Zs_union, 1)
-            area_union = np.sum(Zs_union) * cell**2
-
-            # area_union = np.count_nonzero(Zs_union) * cell**2
-
             Zs_inters = np.minimum(Zs1, Zs2)
 
-            Zs_inters = Zs_inters / np.maximum(Zs_inters, 1)
-            area_inters = np.sum(Zs_inters) * cell**2
+            area_union = np.count_nonzero(Zs_union) * cell**2
 
-            # area_inters = np.count_nonzero(Zs_inters) * cell**2
+            area_inters = np.count_nonzero(Zs_inters) * cell**2
+
             fitting_parameter = area_inters / area_union
 
             print('--------------------------------')
@@ -2465,26 +2446,16 @@ for i_thr in range(n_masking):
             print('Union area', area_union, 'Intersect. area', area_inters)
             print('Fitting parameter', fitting_parameter)
 
-            Zs1_mean = np.mean(Zs1*Zs_inters) * nx*ny / \
-                np.count_nonzero(Zs_inters)
-            Zs2_mean = np.mean(Zs2*Zs_inters) * nx*ny / \
-                np.count_nonzero(Zs_inters)
-
-            Zs1_vol = Zs1_mean * area_inters
-            Zs2_vol = Zs2_mean * area_inters
+            Zs1_vol = np.sum(Zs1 * (np.minimum(Zs1, Zs2) > 0)) * cell**2
+            Zs2_vol = np.sum(Zs2 * (np.minimum(Zs1, Zs2) > 0)) * cell**2
 
             print('Vol 1 in intersect.', Zs1_vol, 'Vol 2 in intersect.',
                   Zs2_vol)
 
-            Zs_diff = np.abs(Zs1 - Zs2)
+            Zs_diff = np.abs(Zs1 - Zs2) * (np.minimum(Zs1, Zs2) > 0)
 
-            Zs_diff = Zs_diff * Zs_inters
-
-            avg_thick_diff = np.mean(Zs_diff) * \
-                nx*ny / np.count_nonzero(Zs_inters)
-            std_thick_diff = np.std(Zs_diff) * nx * \
-                ny / np.count_nonzero(Zs_inters)
-            vol_diff = avg_thick_diff * area_inters
+            vol_diff = np.sum(Zs_diff) * cell**2
+            print('Vol_diff', vol_diff)
 
             rel_err_vol = vol_diff / np.maximum(Zs1_vol, Zs2_vol)
 
@@ -2493,12 +2464,12 @@ for i_thr in range(n_masking):
 
             with open(output_ud, 'a') as ud_file:
 
-                ud_file.write(str(masking_threshold[i_thr])  + ' , ')
-                ud_file.write(str(area_union) + ' , ' + str(area_inters) + ' , ')  
-                ud_file.write(str(fitting_parameter)  + ' , ')
-                ud_file.write(str(Zs1_vol)  + ' , ' + str(Zs2_vol)  + ' , ')
+                ud_file.write(str(masking_threshold[i_thr]) + ' , ')
+                ud_file.write(
+                    str(area_union) + ' , ' + str(area_inters) + ' , ')
+                ud_file.write(str(fitting_parameter) + ' , ')
+                ud_file.write(str(Zs1_vol) + ' , ' + str(Zs2_vol) + ' , ')
                 ud_file.write(str(rel_err_vol) + '\n')
-
 
 output_dist = run_name + '_dist_full.asc'
 
