@@ -882,7 +882,7 @@ def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
     return [last_lobe, x_new, y_new, new_x1, new_x2, new_angle]
 
 
-@njit(fastmath=True)
+# @njit(fastmath=True)
 def step3(angle_idx, deg2rad, old_angle, inertial_exponent):
     """ add inertial effect to lobe direction
     ----------
@@ -929,7 +929,7 @@ def step3(angle_idx, deg2rad, old_angle, inertial_exponent):
     y_avg = (1.0 - alfa_inertial) * \
         sin_angle2 + alfa_inertial * sin_angle1
 
-    angle_avg = np.mod(180 * np.arctan2(y_avg, x_avg) / np.pi, 360)
+    angle_avg = np.mod(180.0 * np.arctan2(y_avg, x_avg) / np.pi, 360.0)
 
     new_angle = angle_avg
 
