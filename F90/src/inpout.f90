@@ -35,12 +35,14 @@ MODULE inpout
   CHARACTER(LEN=40) :: input_file         !< File with the run parameters
   CHARACTER(LEN=40) :: backup_file        !< Bakcup File with the run parameters
   CHARACTER(LEN=40) :: union_diff_file    !< File with previous output to compare
+  CHARACTER(LEN=40) :: ud_output_file     !< File with output of comparison
   INTEGER, PARAMETER :: input_unit = 7       !< Input data unit
   INTEGER, PARAMETER :: topo_unit = 8        !< Topography DEM unit
   INTEGER, PARAMETER :: backup_unit = 9      !> Input Backup data unit
   INTEGER, PARAMETER :: restart_unit = 10
   INTEGER, PARAMETER :: output_unit = 11
   INTEGER, PARAMETER :: asc_unit = 12
+  INTEGER, PARAMETER :: ud_output_unit = 13
 
   INTEGER :: cols, rows
 
@@ -161,6 +163,8 @@ CONTAINS
 
     LOGICAL :: tend1 
     CHARACTER(LEN=80) :: card
+
+    INTEGER :: ud_file
 
     input_file = 'mr_lava_loba.inp'
 
@@ -472,6 +476,27 @@ CONTAINS
     print *, 'Run name ', trim(run_name)
     print *, ''
 
+    IF (union_diff_flag) THEN
+
+       ud_output_file = trim(run_name) // '_ud.csv'
+       
+       ! Open the file in append mode
+       OPEN(unit=ud_output_unit, file=ud_output_file, status='unknown',   &
+            action='write', iostat=ud_file)
+       
+       IF (ud_file /= 0) THEN
+          
+          PRINT *, 'Error opening file:', ud_output_file
+          STOP
+          
+       END IF
+       
+       WRITE(ud_output_unit, '(A)') 'Masking, Union Area, Intersection Area, '  &
+            //'Fitting Parameter, Vol1 in intersection, Vol2 in intersection, ' &
+            //'Thickness relative error'
+
+    END IF
+       
     RETURN
 
   END SUBROUTINE read_param
@@ -732,6 +757,8 @@ CONTAINS
               
     END DO
 
+    IF (union_diff_flag) CLOSE(ud_output_unit)
+    
     RETURN
 
   END SUBROUTINE write_masking
@@ -816,16 +843,16 @@ CONTAINS
     WRITE(*,*) 'Intersection area', area_inters, 'm2'
     WRITE(*,*) 'Fitting parameter', fitting_parameter
     
-    Zud_vol = cell**2 * SUM(Zud *                                          &
+    Zud_vol = cell**2 * SUM(Zud *                                               &
          MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
     
-    Zcheck_vol = cell**2 * SUM(Z_check *                            &
+    Zcheck_vol = cell**2 * SUM(Z_check *                                        &
          MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
     
-    vol_diff = cell**2 * SUM(ABS(Zud-Z_check) *                         &
+    vol_diff = cell**2 * SUM(ABS(Zud-Z_check) *                                 &
          MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
     
-    WRITE(*,*) 'Volume 1 in intersection', Zud_vol,                       &
+    WRITE(*,*) 'Volume 1 in intersection', Zud_vol,                             &
          'm3 Volume 2 in intersection', Zcheck_vol, 'm3'
     
     total_masked_Zflow = sum(Zflow*Z_check)
@@ -835,6 +862,12 @@ CONTAINS
     WRITE(*,*) 'Thickness relative error', rel_err_vol
     WRITE(*,*) '--------------------------------'
 
+    
+    WRITE(ud_output_unit, '(ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4)') &
+         thr_value, ' , ', area_union, ' , ', area_inters, ' , ', fitting_parameter, &
+         ' , ', Zud_vol, ' , ', Zcheck_vol, ' , ', rel_err_vol
+
+    
   END SUBROUTINE eval_union_diff
   
     

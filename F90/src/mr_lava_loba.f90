@@ -90,7 +90,7 @@ PROGRAM mr_lava_loba
   IF (union_diff_flag) THEN
           
      CALL eval_union_diff(Zflow, 1.0_wp)
-          
+     
   END IF
   
   CALL write_masking
