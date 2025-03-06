@@ -518,6 +518,9 @@ CONTAINS
     
     CALL read_asc(source,arr_temp, lx, ly, cols, rows, cell, nd)
 
+    WRITE(*,*) 'Extent of the DEM'
+    WRITE(*,*) 'xW,xE,yS,yN',lx,lx+cols*cell,ly,ly+rows*cell
+    
     allocate(xc_temp(cols))
     allocate(yc_temp(rows))    
 
@@ -542,6 +545,14 @@ CONTAINS
 
        WRITE(*,*) 'Cropping of original DEM'
        WRITE(*,*) 'xW,xE,yS,yN', xW, xE, yS, yN
+
+       IF ( ( xW<lx) .OR. ( xE>lx+cols*cell ) .OR. ( yS<ly ) .OR.               &
+            ( yN>ly+rows*cell ) ) THEN
+
+          WRITE(*,*) 'ERROR: problem with namelist CROP_PARAMETERS'          
+          STOP
+          
+       END IF
 
        ! crop the DEM to the desired domain
        iW = MAX(0, (floor((xW - lx) / cell)) ) + 1
