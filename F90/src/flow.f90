@@ -307,7 +307,7 @@ CONTAINS
 
           dist_int(i) = 0
           descendents(i) = 0
-          
+
           CALL step1A(x(i), y(i), max_slope_angle, slope)
 
           CALL step2(slope, max_slope_angle, angle(i))
@@ -448,8 +448,6 @@ CONTAINS
 
     END DO
 
-    WRITE(*,*)
-
     RETURN
 
   END SUBROUTINE flow_loop
@@ -575,7 +573,7 @@ CONTAINS
 
        case (0)
           ! vent_flag = 0: initial lobes are on the vents coordinates
-          i_vent = int(floor(real(i_flow) * real(n_vents) / real(n_flows))) + 1
+          i_vent = int(floor(real(i_flow-1) * real(n_vents) / real(n_flows))) + 1
           x_i = x_vent(i_vent)
           y_i = y_vent(i_vent)
 
