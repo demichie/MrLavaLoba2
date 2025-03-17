@@ -1391,6 +1391,34 @@ def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
 def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
                y_vent_end):
 
+    """ this function, compute the coordinate of the first lobe of a flow 
+
+    Parameters
+    ----------
+    n_vents : integer
+        total number of vents/segments
+    flow : integer
+        index of the flow
+    x_vent : float array
+        x-coordinates of the vents/fissure points
+    y_vent : float array
+        y-coordinates of the vents/fissure points
+    cum_fiss_length : float array
+        cumulative length/probability of the segments
+    x_vent_end : float array
+        x-coordinates of the vents/fissure endpoints
+    y_vent_end : float array
+        y-coordinates of the vents/fissure endpoints
+
+
+    Returns
+    -------
+    x_i : float
+         x-coordinates of the first lobe center
+    y_i : float
+         y-coordinates of the first lobe center
+    """
+
     if (n_vents == 1):
 
         x_i = x_vent[0]
@@ -1431,7 +1459,7 @@ def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
             #                   connecting the vents and the probability of
             #                   each segment is fixed in the input file
 
-            alfa_polyline = np.random.uniform(0, 1, size=1)
+            alfa_polyline = np.random.random()
 
             idx_vent = np.argmax(cum_fiss_length > alfa_polyline)
 
@@ -1454,7 +1482,7 @@ def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
 
             i_segment = randrange(n_vents)
 
-            alfa_segment = np.random.uniform(0, 1, size=1)
+            alfa_segment = np.random.random()
 
             x_i = alfa_segment * x_vent[i_segment] + \
                 (1.0 - alfa_segment) * x_vent[i_segment-1]
@@ -1472,15 +1500,17 @@ def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
             #                   fissures and the probability of
             #                   each fissure is fixed in the input file
 
-            alfa_polyline = np.random.uniform(0, 1, size=1)
+            # alfa_polyline = np.random.uniform(0, 1, size=1)[0]
+            alfa_polyline = np.random.random()
+
             idx_vent = np.argmax(cum_fiss_length > alfa_polyline)
             num = alfa_polyline - cum_fiss_length[idx_vent - 1]
             den = cum_fiss_length[idx_vent] - cum_fiss_length[idx_vent - 1]
 
             alfa_segment = num / den
-            print()
-            print(idx_vent - 1, alfa_segment)
-
+            #print(num,den)
+            #print(idx_vent - 1, alfa_segment)
+            
             x_i = alfa_segment * x_vent_end[idx_vent-1] + \
                 (1.0 - alfa_segment) * x_vent[idx_vent-1]
 
@@ -1583,6 +1613,10 @@ if ('x_vent_end' not in globals()):
 
 x_vent = np.array(x_vent)
 y_vent = np.array(y_vent)
+
+x_vent_end = np.array(x_vent_end)
+y_vent_end = np.array(y_vent_end)
+
 
 try:
 
