@@ -50,7 +50,8 @@ MODULE inpout
        hazard_flag, volume_flag, fixed_dimension_flag, topo_mod_flag,           &
        restart_flag, nc_flag , asc_flag, union_diff_flag
 
-  NAMELIST / vent_parameters / n_vents, x_vent, y_vent , x_vent_end , y_vent_end
+  NAMELIST / vent_parameters / n_vents, x_vent, y_vent , x_vent_end ,           &
+       y_vent_end , fissure_probabilities
 
   NAMELIST / crop_parameters / east_to_vent, west_to_vent, south_to_vent,       &
        north_to_vent
@@ -103,6 +104,8 @@ CONTAINS
     x_vent_end(:) = -9999.0_wp
     y_vent_end(:) = -9999.0_wp
 
+    ALLOCATE(fissure_probabilities(20))
+    fissure_probabilities(:) = -9999.0_wp
     
     east_to_vent = -9999.0_wp
     west_to_vent = -9999.0_wp
@@ -155,6 +158,8 @@ CONTAINS
 
     REAL(wp), ALLOCATABLE :: x_vent_end_temp(:)
     REAL(wp), ALLOCATABLE :: y_vent_end_temp(:)
+
+    REAL(wp), ALLOCATABLE :: fissure_probabilities_temp(:)
     
     CHARACTER(LEN = 40), ALLOCATABLE :: restart_files_temp(:)
     REAL(wp), ALLOCATABLE :: restart_filling_parameters_temp(:)
@@ -252,6 +257,24 @@ CONTAINS
           DEALLOCATE(y_vent_end_temp)
                     
        END IF
+
+
+       IF ( ABS(fissure_probabilities(1) - (-9999.0_wp) )>= eps ) THEN
+
+          ALLOCATE(fissure_probabilities_temp(n_vents))
+          
+          fissure_probabilities_temp(1:n_vents) = fissure_probabilities(1:n_vents)
+          
+          DEALLOCATE(fissure_probabilities)
+
+          ALLOCATE(fissure_probabilities(n_vents))
+
+          fissure_probabilities_temp(1:n_vents) = fissure_probabilities(1:n_vents)
+
+          DEALLOCATE(fissure_probabilities_temp)
+                    
+       END IF
+       
        
        REWIND(input_unit)
 

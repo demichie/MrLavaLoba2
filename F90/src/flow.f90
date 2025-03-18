@@ -617,6 +617,7 @@ CONTAINS
                (1.0 - alfa_segment) * y_vent(i_segment - 1)
 
        case (4, 7)
+
           ! vent_flag = 4 or 7: initial lobes on multiple fissures
           call random_number(alfa_polyline)
           alfa_polyline = alfa_polyline * cum_fiss_length(n_vents)
@@ -629,11 +630,11 @@ CONTAINS
           den = cum_fiss_length(idx_vent) - cum_fiss_length(idx_vent - 1)
           alfa_segment = num / den
 
-          x_i = alfa_segment * x_vent_end(idx_vent - 1) + &
-               (1.0 - alfa_segment) * x_vent(idx_vent - 1)
+          x_i = alfa_segment * x_vent_end(idx_vent) + &
+               (1.0 - alfa_segment) * x_vent(idx_vent)
 
-          y_i = alfa_segment * y_vent_end(idx_vent - 1) + &
-               (1.0 - alfa_segment) * y_vent(idx_vent - 1)
+          y_i = alfa_segment * y_vent_end(idx_vent) + &
+               (1.0 - alfa_segment) * y_vent(idx_vent)
 
        case (5)
           ! vent_flag = 5: initial lobes on multiple fissures with equal

@@ -57,7 +57,7 @@ PROGRAM mr_lava_loba
 
   IF (union_diff_flag) CALL init_union_diff
 
-    WRITE(*,*) 'End pre-processing'
+  WRITE(*,*) 'End pre-processing'
   WRITE(*,*)
 
   CALL cpu_time(t2)
