@@ -465,22 +465,24 @@ CONTAINS
     REAL(wp) :: delta_xvent, delta_yvent
     INTEGER :: j, first_j
 
+    REAL(wp) :: tot_length
+    
     ! Check for the presence of x_vent_end and y_vent_end
     IF (allocated(x_vent_end) .and. size(x_vent_end) > 0 .and. vent_flag > 3)   &
          THEN
 
        first_j = 1
-       allocate(cum_fiss_length(n_vents + 1))
+       allocate(cum_fiss_length(n_vents))
 
     ELSE
 
        first_j = 2
-       allocate(cum_fiss_length(n_vents))
+       allocate(cum_fiss_length(n_vents-1))
 
     END IF
 
-    cum_fiss_length = 0.0_wp
-
+    tot_length = 0.0_wp
+    
     ! Loop over vents
     do j = first_j, n_vents
 
@@ -489,18 +491,20 @@ CONTAINS
 
           delta_xvent = x_vent_end(j) - x_vent(j)
           delta_yvent = y_vent_end(j) - y_vent(j)
-          cum_fiss_length(j) = cum_fiss_length(j-1) + sqrt(delta_xvent**2 +     &
+          cum_fiss_length(j) = tot_length + sqrt(delta_xvent**2 +     &
                delta_yvent**2)
 
        else
 
           delta_xvent = x_vent(j) - x_vent(j-1)
           delta_yvent = y_vent(j) - y_vent(j-1)
-          cum_fiss_length(j) = cum_fiss_length(j-1) + sqrt(delta_xvent**2 +     &
+          cum_fiss_length(j) = tot_length + sqrt(delta_xvent**2 +     &
                delta_yvent**2)
 
        end if
 
+       tot_length = cum_fiss_length(j)
+       
     end do
 
     ! If x_vent_end is not allocated, set default values
@@ -512,7 +516,7 @@ CONTAINS
 
     ! Normalize cum_fiss_length if there are more than one vents
     if (n_vents > 1) then
-       cum_fiss_length(2:n_vents) = cum_fiss_length(2:n_vents) /                &
+       cum_fiss_length(1:n_vents) = cum_fiss_length(1:n_vents) /                &
             cum_fiss_length(n_vents)
     end if
 

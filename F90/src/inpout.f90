@@ -250,8 +250,8 @@ CONTAINS
           ALLOCATE(x_vent_end(n_vents))
           ALLOCATE(y_vent_end(n_vents))
 
-          x_vent_end_temp(1:n_vents) = x_vent_end(1:n_vents)
-          y_vent_end_temp(1:n_vents) = y_vent_end(1:n_vents)
+          x_vent_end(1:n_vents) = x_vent_end_temp(1:n_vents)
+          y_vent_end(1:n_vents) = y_vent_end_temp(1:n_vents)
 
           DEALLOCATE(x_vent_end_temp)
           DEALLOCATE(y_vent_end_temp)
