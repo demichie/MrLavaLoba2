@@ -514,22 +514,22 @@ CONTAINS
        y_vent_end = 0.0_wp
     end if
 
+    ! Handle fissure_probabilities if available
+    if (allocated(fissure_probabilities)) then
+       if (vent_flag == 8) then
+          cum_fiss_length = cumsum(fissure_probabilities)
+       elseif (vent_flag > 5) then
+          cum_fiss_length(1:n_vents) = cumsum(fissure_probabilities)
+       end if
+    end if
+    
     ! Normalize cum_fiss_length if there are more than one vents
     if (n_vents > 1) then
        cum_fiss_length(1:n_vents) = cum_fiss_length(1:n_vents) /                &
             cum_fiss_length(n_vents)
     end if
 
-    ! Handle fissure_probabilities if available
-    if (allocated(fissure_probabilities)) then
-       if (vent_flag == 8) then
-          cum_fiss_length = cumsum(fissure_probabilities)
-       elseif (vent_flag > 5) then
-          cum_fiss_length(2:n_vents) = cumsum(fissure_probabilities)
-       end if
-    end if
-
-    ! (Optional) Print the cumulative fissure lengths for debugging
+    ! Print the cumulative fissure lengths for debugging
     WRITE(*,*) 'cum_fiss_length',cum_fiss_length
 
     RETURN

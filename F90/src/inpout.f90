@@ -261,6 +261,16 @@ CONTAINS
 
        IF ( ABS(fissure_probabilities(1) - (-9999.0_wp) )>= eps ) THEN
 
+          IF ( vent_flag .LE. 5 ) THEN
+
+             WRITE(*,*)
+             WRITE(*,*) 'WARNING: FISSURE_PROBABILITIES'
+             WRITE(*,*) 'vent_flag =',vent_flag
+             WRITE(*,*) 'Values given in input file will no be used'
+             WRITE(*,*)
+
+          END IF
+             
           ALLOCATE(fissure_probabilities_temp(n_vents))
           
           fissure_probabilities_temp(1:n_vents) = fissure_probabilities(1:n_vents)
@@ -269,10 +279,24 @@ CONTAINS
 
           ALLOCATE(fissure_probabilities(n_vents))
 
-          fissure_probabilities_temp(1:n_vents) = fissure_probabilities(1:n_vents)
+          fissure_probabilities(1:n_vents) = fissure_probabilities_temp(1:n_vents)
 
           DEALLOCATE(fissure_probabilities_temp)
-                    
+
+       ELSE
+
+          IF ( vent_flag .EQ. 7 ) THEN
+
+             WRITE(*,*)
+             WRITE(*,*) 'ERROR: problem with namelist VENT_PARAMETERS'
+             WRITE(*,*) 'FISSURE_PROBABILITIES require with VENT_FLAG=7'
+             WRITE(*,*) 'Please check the input file'
+             WRITE(*,*)
+             WRITE(*,vent_parameters)
+             STOP
+
+          END IF
+          
        END IF
        
        
