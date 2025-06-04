@@ -129,7 +129,7 @@ The `ETNA_LFS1` (or your copied) folder contains:
 Within your activated `MrLavaLoba` conda environment, install the necessary Python libraries:
 ```bash
 conda install pandas scipy numba
-
+'''
 
 ### 3.3. Input Parameters and Code Calibration
 
