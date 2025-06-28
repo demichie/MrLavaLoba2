@@ -432,6 +432,6 @@ A major highway (the main trunk of the lava flow) will have a high `Zhazard` val
 **In summary:**
 
 *   **`Zflow` (Thickness Map)** answers the question: "**Where** will the lava ultimately accumulate?"
-*   **`Zhazard` (Relative Risk Map)** answers the question: "**Through which paths** is the lava most likely to travel and concentrate its energy?"
+*   **`Zhazard` (Relative Risk Map)** answers the question: "**Through which paths** is the lava most likely to travel?"
 
 For volcanic hazard mapping and land-use planning, `Zhazard` is often a more informative and powerful tool than the final thickness map alone because it clearly highlights the primary and most robust flow corridors.
