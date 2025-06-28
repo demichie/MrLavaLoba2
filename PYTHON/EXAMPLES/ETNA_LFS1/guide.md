@@ -283,3 +283,9 @@ Unlike the Python version, you run the compiled executable directly from the com
     ```
     
 Remember to set the `LD_LIBRARY_PATH` (Step 4) in any new terminal session before running the executable.
+
+
+This section is read sequentially by the program and works as follows:
+1.  `'MASKING_THRESHOLDS'`: A simple string header that the code looks for to start reading the thresholds.
+2.  `2`: An integer specifying **how many** threshold values will follow. In this case, two.
+3.  `0.97`, `0.95`: The actual threshold values. This is an enhancement over the Python version's single `masking_threshold`, as it allows the Fortran code to generate multiple masked output files (e.g., `_masked_0_97.asc` and `_masked_0_95.asc`) in a single run.
