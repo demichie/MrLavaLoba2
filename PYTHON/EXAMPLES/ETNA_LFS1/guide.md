@@ -180,3 +180,107 @@ As a rule of thumb, it is recommended to vary one parameter at a time and then c
 | `max_slope_prob`       | Controls the probability that the direction of a new lobe is aligned with the steepest slope direction. This parameter ranges from `0` to `1`:<br>• If `max_slope_prob = 0`, all directions have the same probability and the direction of maximum slope is not favored, resulting in greater areal dispersion.<br>• If `max_slope_prob = 1`, the new lobe direction always follows the steepest slope, favoring highly channeled lava flows along narrow paths. |
 | `inertial_exponent`    | Parameter that controls how much the propagation direction of a new lobe inherits from its parent lobe. It ranges from `0` to `1`:<br>• If `inertial_exponent = 0` → the most probable direction is that of the steepest slope<br>• If `inertial_exponent > 0` → the direction also takes into account the orientation of the parent lobe |
 | `union_diff_file`      | Command that runs the executable file calculating the difference between the area invaded by flows from a specific simulation and the area covered by any other simulation (or the real lava flow area, as in this case). This file can be used to compare results from different simulations or to assess model result convergence. Notice that running this command implies the availability of the ASC file representing the real lava flow deposit. |
+
+
+## 5. Installing and Running the Fortran Version
+
+For users seeking maximum performance, particularly for large or numerous simulations, a Fortran version of MrLavaLoba is available. This version is significantly faster than the Python version but requires a manual compilation step.
+
+The following instructions are for a Linux environment (including WSL on Windows).
+
+### 5.1. Compilation Steps
+
+#### Step 1: Install a Fortran Compiler and NetCDF Library
+
+The compilation requires a Fortran compiler (`gfortran`) and the NetCDF library for Fortran, which is used for handling scientific data formats. The easiest way to install both is using Conda, preferably within the same environment you created for the Python version.
+
+1.  Activate your conda environment (if not already active):
+    ```bash
+    conda activate MrLavaLoba
+    ```
+
+2.  Install `gfortran` and `netcdf-fortran` from the `conda-forge` channel:
+    ```bash
+    conda install conda-forge::gfortran
+    conda install conda-forge::netcdf-fortran
+    ```
+
+#### Step 2: Locate the NetCDF Library Path
+
+The compiler needs to know where the NetCDF library files are located. You must find the path to your active conda environment's library directory.
+
+1.  If you are unsure of the exact path, you can list your conda environments:
+    ```bash
+    conda info --envs
+    ```
+    The output will show the path to your `MrLavaLoba` environment. It will look something like this:
+    ```
+    # conda environments:
+    #
+    base                     /home/user/anaconda3
+    MrLavaLoba            *  /home/user/anaconda3/envs/MrLavaLoba
+    ```
+
+2.  The library path you need is the environment path plus `/lib`. Based on the example above, the path would be:
+    `/home/user/anaconda3/envs/MrLavaLoba/lib`
+
+    > **Note:** If you installed the packages in your `base` conda environment, the path would be `/home/user/anaconda3/lib`. It is highly recommended to use a dedicated environment.
+
+#### Step 3: Edit the Makefile
+
+The `Makefile` is a script that contains instructions for the `make` command to compile the source code. You need to edit it to point to the NetCDF library path you found in the previous step.
+
+1.  Navigate to the Fortran source code directory:
+    ```bash
+    cd MrLavaLoba2-main/FORTRAN/src/
+    ```
+
+2.  Open the `Makefile` with a text editor (e.g., `nano`):
+    ```bash
+    nano Makefile
+    ```
+
+3.  Inside the file, look for a variable that defines the NetCDF path. It might be named `NETCDF_PATH`, `NETCDF`, or similar. You need to change its value to the full path of your conda environment. For example, you might change a line like:
+    
+    `NETCDF = /usr/local/netcdf`
+    
+    to:
+    
+    `NETCDF = /home/user/anaconda3/envs/MrLavaLoba`
+    
+    **Important:** Make sure the path points to the main directory of the environment (e.g., `/.../MrLavaLoba`), not the `lib` sub-directory, as the Makefile will likely add `/lib` and `/include` itself. Check the Makefile's syntax to be sure. Save the file and exit the editor.
+
+#### Step 4: Set the Library Path Environment Variable
+
+Before compiling, you must also tell your system where to find the shared libraries at runtime. You do this by setting the `LD_LIBRARY_PATH` environment variable.
+
+1.  In your terminal, run the following command, replacing the example path with your actual library path from Step 2:
+    ```bash
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/home/user/anaconda3/envs/MrLavaLoba/lib"
+    ```
+
+    > This command is temporary and only applies to your current terminal session. If you close the terminal, you will need to run it again before executing the compiled code.
+
+#### Step 5: Compile the Code
+
+Now you are ready to compile.
+
+1.  Ensure you are still in the `MrLavaLoba2-main/FORTRAN/src/` directory.
+2.  Run the `make` command:
+    ```bash
+    make
+    ```
+    If all steps were done correctly, the compilation will proceed without errors. An executable file (e.g., `mr_lava_loba.x`) will be created in the `src` directory or a parent directory.
+
+### 5.2. Running a Fortran Simulation
+
+Unlike the Python version, you run the compiled executable directly from the command line.
+
+1.  The Fortran version will likely require an input file, similar to the `input_data.py` file but in a simple text format. Check the `FORTRAN/EXAMPLES` directory for examples of how to structure this input file.
+2.  To run a simulation, you would typically execute a command like:
+    ```bash
+    ./mr_lava_loba.x name_of_your_input_file.txt
+    ```
+    (The exact command and executable name may vary. Refer to the specific examples provided with the Fortran code.)
+
+Remember to set the `LD_LIBRARY_PATH` (Step 4) in any new terminal session before running the executable.
