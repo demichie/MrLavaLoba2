@@ -284,6 +284,71 @@ Unlike the Python version, you run the compiled executable directly from the com
     
 Remember to set the `LD_LIBRARY_PATH` (Step 4) in any new terminal session before running the executable.
 
+### 5.3. The Fortran Input File (`mr_lava_loba.inp`)
+
+The Fortran version is configured using a plain text input file, `mr_lava_loba.inp`. This file uses a structure called **Fortran Namelist**. Each section begins with `&SECTION_NAME` and ends with a forward slash `/`.
+
+Unlike the Python version where you edit a script, here you simply provide values for pre-defined variables. Let's break down the structure of the `ETNA_LFS1/mr_lava_loba.inp` example file.
+
+The main sections (namelists) are:
+*   `&RUN_PARAMETERS`: General settings for the simulation run, output flags, and model behavior.
+*   `&UNION_DIFF_PARAMETERS`: Parameters for comparing the simulation output against a reference map.
+*   `&VENT_PARAMETERS`: Defines the location of the eruptive vent(s).
+*   `&CROP_PARAMETERS`: Defines the boundaries for cropping the DEM.
+*   `&FLOW_PARAMETERS`: Core parameters controlling the physics and emplacement of the lava flow.
+*   `&NUMERICAL_PARAMETERS`: Advanced settings for numerical precision.
+
+Below is a detailed breakdown of the most important parameters.
+
+**Parameter Description Table**
+
+| Namelist / Parameter             | Example Value               | Description                                                                                                                                                                                                          |
+|----------------------------------|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **&RUN_PARAMETERS**              |                             |                                                                                                                                                                                                                      |
+| `RUN_NAME`                       | `"LFS1_2001"`               | The base name for all output files, just like in the Python version.                                                                                                                                                 |
+| `SOURCE`                         | `"tinit_33.asc"`            | The input DEM file in ASCII grid format.                                                                                                                                                                             |
+| `VENT_FLAG`                      | `0`                         | Same as the Python version (e.g., `0` for a fixed point vent).                                                                                                                                                        |
+| `CROP_FLAG`                      | `T`                         | A logical flag (`T` for True, `F` for False) to enable or disable the cropping of the DEM based on the `&CROP_PARAMETERS` section.                                                                                      |
+| `HAZARD_FLAG`                    | `F`                         | Logical flag (`T`/`F`) to enable or disable the generation of a probability map.                                                                                                                                     |
+| `VOLUME_FLAG`                    | `T`                         | Logical flag (`T`/`F`) indicating if the total volume is provided.                                                                                                                                                     |
+| `FIXED_DIMENSION_FLAG`           | `T`                         | Logical flag (`T`/`F`) indicating if lobe dimensions are fixed (e.g., `LOBE_AREA`).                                                                                                                                  |
+| `TOPO_MOD_FLAG`                  | `T`                         | Logical flag (`T`/`F`) to enable or disable topography modification by emplaced lobes.                                                                                                                               |
+| `RESTART_FLAG`                   | `F`                         | Logical flag (`T`/`F`) to restart a simulation from a previous state.                                                                                                                                                |
+| `NC_FLAG`                        | `T`                         | Logical flag (`T`/`F`) to enable saving output in **NetCDF** format.                                                                                                                                                  |
+| `ASC_FLAG`                       | `T`                         | Logical flag (`T`/`F`) to enable saving output in **ASCII grid** (`.asc`) format.                                                                                                                                     |
+| `UNION_DIFF_FLAG`                | `T`                         | Logical flag (`T`/`F`) to enable or disable the comparison with a reference file defined in `&UNION_DIFF_PARAMETERS`.                                                                                                  |
+| **&UNION_DIFF_PARAMETERS**       |                             |                                                                                                                                                                                                                      |
+| `UNION_DIFF_FILE`                | `"comparison_0_95.asc"`     | The path to the reference file (e.g., a real lava flow map) for comparison.                                                                                                                                          |
+| **&VENT_PARAMETERS**             |                             |                                                                                                                                                                                                                      |
+| `N_VENTS`                        | `1`                         | The number of vents defined. This is explicit, unlike the Python version which infers it.                                                                                                                            |
+| `X_VENT`, `Y_VENT`               | `500492.0`, `4173310.0`      | The coordinates of the vent(s). If `N_VENTS > 1`, you would list them sequentially.                                                                                                                                  |
+| **&CROP_PARAMETERS**             |                             |                                                                                                                                                                                                                      |
+| `EAST_TO_VENT`, etc.             | `5000.0`, etc.              | Distances (in meters) from the vent to define the cropping box. Same as the Python version.                                                                                                                          |
+| **&FLOW_PARAMETERS**             |                             |                                                                                                                                                                                                                      |
+| `N_FLOWS`                        | `8192`                      | The number of computational lobe chains.                                                                                                                                                                             |
+| `MIN_N_LOBES`, `MAX_N_LOBES`     | `207`, `207`                | The minimum and maximum number of lobes per chain.                                                                                                                                                                   |
+| `TOTAL_VOLUME`                   | `30000000.0`                | Total volume of the eruption in cubic meters.                                                                                                                                                                        |
+| `LOBE_AREA`                      | `1000.0`                    | The area of each lobe in square meters.                                                                                                                                                                              |
+| `THICKNESS_RATIO`                | `0.038`                     | Ratio of thickness between the first and last lobe.                                                                                                                                                                  |
+| `THICKENING_PARAMETER`           | `0.990`                     | Controls the tendency of the flow to pile up vs. spread.                                                                                                                                                             |
+| `LOBE_EXPONENT`                  | `0.0`                       | Influences branching vs. single-chain propagation.                                                                                                                                                                   |
+| `MAX_SLOPE_PROB`                 | `0.20`                      | Probability of following the steepest descent path.                                                                                                                                                                  |
+| `INERTIAL_EXPONENT`              | `0.125`                     | Controls how much a new lobe's direction is influenced by its parent.                                                                                                                                                |
+| `ASPECT_RATIO_COEFF`             | `20.0`                      | An advanced parameter likely related to the initial shape of the lobes.                                                                                                                                              |
+| `MAX_ASPECT_RATIO`               | `5.0`                       | The maximum allowed aspect ratio (length/width) for a lobe.                                                                                                                                                          |
+| **&NUMERICAL_PARAMETERS**        |                             |                                                                                                                                                                                                                      |
+| `NPOINTS`, `NV`                  | `30`, `15`                  | Advanced numerical parameters, likely related to discretization or integration points. It is recommended to keep the default values unless you are an expert user.                                                     |
+
+#### The `MASKING_THRESHOLDS` Section
+
+After all the `&.../` namelist blocks, you will find a separate section that does not follow the namelist format.
+
+```
+'MASKING_THRESHOLDS'
+2
+0.97
+0.95
+```
 
 This section is read sequentially by the program and works as follows:
 1.  `'MASKING_THRESHOLDS'`: A simple string header that the code looks for to start reading the thresholds.
