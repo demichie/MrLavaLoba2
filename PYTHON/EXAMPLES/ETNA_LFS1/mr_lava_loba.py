@@ -40,9 +40,7 @@ import time
 from scipy.stats import beta
 from linecache import getline
 import numpy as np
-from input_data_advanced import n_check_loop
 from numba import njit
-import numba
 
 
 def initialize_topo(source):
@@ -90,7 +88,7 @@ def initialize_topo(source):
     jN : integer
         last index in the y-direction for the topography crop
     iW : integer
-        first index in the x-direction for the topography crop    
+        first index in the x-direction for the topography crop
     iE : integer
         lasst index in the x-direction for the topography crop
     """
@@ -731,7 +729,7 @@ def compute_semiaxis(slope, max_aspect_ratio, aspect_ratio_coeff, lobe_area):
 def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
               zidx, max_cells, lobe_area, max_aspect_ratio, aspect_ratio_coeff,
               dist_fact, cos_angle1, sin_angle1, xcmin, ycmin, Ztot, nx, ny):
-    """Compute 
+    """Compute
 
     Parameters
     ----------
@@ -754,7 +752,7 @@ def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
     max_cells : float
         maximum number of cells covered by a lobe in 1D
     lobe_area : float
-        area of elliptical lobe  
+        area of elliptical lobe
     max_aspect_ratio : float
         max_aspect_ratio of elliptical lobe
     aspect_ratio_coeff : float
@@ -762,15 +760,15 @@ def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
     dist_fact : float
         coefficient for center of new lobe position
     cos_angle1 : float
-        cosine of parent lobe orientation angle                  
+        cosine of parent lobe orientation angle
     sin_angle1 : float
-        sine of parent lobe orientation angle  
+        sine of parent lobe orientation angle
     xcmin : float
-        x-coordinate of lower-left cell center of the grid                    
+        x-coordinate of lower-left cell center of the grid
     ycmin : float
-        y-coordinate of lower-left cell center of the grid 
+        y-coordinate of lower-left cell center of the grid
     Ztot : float 2D array
-        array of topography elevation                       
+        array of topography elevation
 
     Returns
     -------
@@ -779,11 +777,11 @@ def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
     x_new : float
         x-coordinate of new lobe center
     y_new : float
-        y-coordinate of new lobe center    
-    new_x1 : float 
+        y-coordinate of new lobe center
+    new_x1 : float
         first semiaxis of new lobe
     new_x2 : float
-        second semiaxis of new lobe    
+        second semiaxis of new lobe
     new_angle: float
         orientation angle of new lobe
 
@@ -921,7 +919,7 @@ def step3(angle_idx, deg2rad, old_angle, inertial_exponent):
 
     else:
 
-        alfa_inertial = (1.0 - (2.0 * np.arctan(slope) / np.pi)**
+        alfa_inertial = (1.0 - (2.0 * np.arctan(slope) / np.pi) **
                          inertial_exponent)**(1.0 / inertial_exponent)
 
     x_avg = (1.0 - alfa_inertial) * \
@@ -1306,11 +1304,11 @@ def ellipse(xc, yc, ax1, ax2, angle, X_circle, Y_circle):
 @njit(fastmath=True)
 def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
                        nv2):
-    """ this function, given and ellipse and a grid of square cells, return 
+    """ this function, given and ellipse and a grid of square cells, return
         a 2d array with the intersections of the ellipse and cells, in terms of
         fraction of cell covered by the ellipse. the accuracy of this procedure
         depends on the resolution of xv and yv representing a grid of points
-        [-0.5*cell;0.5*cell] X [-0.5*cell;0.5*cell] built around the cell 
+        [-0.5*cell;0.5*cell] X [-0.5*cell;0.5*cell] built around the cell
         centers
 
     Parameters
@@ -1320,13 +1318,13 @@ def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
     Yc_local : float 2D array
         y-cooredinates of the centers of the local grid cells
     xc_e : float
-        x-coordinate of ellipse center    
+        x-coordinate of ellipse center
     yc_e : float
-        y-coordinate of ellipse center  
+        y-coordinate of ellipse center
     ax1 : float
-        first semiaxis of the ellipse  
+        first semiaxis of the ellipse
     ax2 : float
-        second semiaxis of the ellipse  
+        second semiaxis of the ellipse
     angle : float
         orientation angle of the ellipse
     xv : float array
@@ -1390,8 +1388,7 @@ def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
 @njit(fastmath=True, nogil=True, cache=True)
 def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
                y_vent_end):
-
-    """ this function, compute the coordinate of the first lobe of a flow 
+    """ this function, compute the coordinate of the first lobe of a flow
 
     Parameters
     ----------
@@ -1508,9 +1505,9 @@ def first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length, x_vent_end,
             den = cum_fiss_length[idx_vent] - cum_fiss_length[idx_vent - 1]
 
             alfa_segment = num / den
-            #print(num,den)
-            #print(idx_vent - 1, alfa_segment)
-            
+            # print(num,den)
+            # print(idx_vent - 1, alfa_segment)
+
             x_i = alfa_segment * x_vent_end[idx_vent-1] + \
                 (1.0 - alfa_segment) * x_vent[idx_vent-1]
 
@@ -1617,7 +1614,6 @@ y_vent = np.array(y_vent)
 x_vent_end = np.array(x_vent_end)
 y_vent_end = np.array(y_vent_end)
 
-
 try:
 
     from input_data import fissure_probabilities
@@ -1701,7 +1697,6 @@ x2 = np.zeros(alloc_n_lobes)
 h = np.zeros(alloc_n_lobes)
 
 dist_int = np.zeros(alloc_n_lobes, dtype=int) - 1
-descendents = np.zeros(alloc_n_lobes, dtype=int)
 parent = np.zeros(alloc_n_lobes, dtype=int)
 
 try:
@@ -1906,8 +1901,6 @@ for flow in range(0, n_flows):
     Zflow_local_array = np.zeros((alloc_n_lobes, max_cells, max_cells),
                                  dtype=int)
 
-    descendents = np.zeros(alloc_n_lobes, dtype=int)
-
     if (a_beta == 0) and (b_beta == 0):
 
         # DEFINE THE NUMBER OF LOBES OF THE FLOW (RANDOM VALUE BETWEEN
@@ -1959,9 +1952,8 @@ for flow in range(0, n_flows):
         x[i], y[i] = first_lobe(n_vents, flow, x_vent, y_vent, cum_fiss_length,
                                 x_vent_end, y_vent_end)
 
-        # initialize distance from first lobe and number of descendents
+        # initialize distance from first lobe
         dist_int[i] = 0
-        descendents[i] = 0
 
         max_slope_angle, slope = step1A(x[i], y[i], xcmin, ycmin, cell, Ztot)
 
@@ -2033,16 +2025,6 @@ for flow in range(0, n_flows):
         # chain
         parent[i] = idx
         dist_int[i] = dist_int[idx] + 1
-        """
-        # for all the "ancestors" increase by one the number of descendents
-
-        last = i
-        for j in range(0, dist_int[idx] + 1):
-
-            previous = parent[last]
-            descendents[previous] = descendents[previous] + 1
-            last = previous
-        """
 
         # local slope of the topography. The slope affects both the location of
         # the new lobe on the boundary of the previous one and its aspect
@@ -2162,12 +2144,29 @@ for flow in range(0, n_flows):
 
     if (hazard_flag):
 
+        # Initialize every node's count to 1 (for itself).
+        descendants = np.ones(last_lobe, dtype=int)
+
+        # Iterate backwards from the last created lobe to the first.
+        # This ensures that a lobe's own descendant count is finalized before
+        # we add it to its parent.
+        for i in range(last_lobe - 1, 0,
+                       -1):  # Loop from last_lobe-1 down to 1
+            p_idx = parent[i]
+            # Add the count of the child (i) to its parent (p_idx)
+            descendants[p_idx] += descendants[i]
+
+        # The array now contains the size of the subtree at each node.
+        # To match the original definition (count of descendants *excluding*
+        # the node), subtract 1 from every element.
+        descendants -= 1
+
         parent_list = list(parent[:last_lobe])
         parent_list[0] = None
         tree = dict(zip(range(last_lobe), parent_list))
         depth = calculate_depth(tree)
 
-        # update the hazard map accounting for the number of descendents,
+        # update the hazard map accounting for the number of descendants,
         # representative of the number of times a flow has passed over a cell
 
         for i in range(0, last_lobe):
@@ -2225,12 +2224,12 @@ for flow in range(0, n_flows):
                                                      i_West)] *= (
                                                          1 - Zlocal_parent)
 
-                Zhazard[j_South:j_North, i_West:i_East] += descendents[i] \
+                Zhazard[j_South:j_North, i_West:i_East] += descendants[i] \
                     * Zlocal_new[0:j_North-j_South, 0:i_East-i_West]
 
             else:
 
-                Zhazard[j_South:j_North, i_West:i_East] += descendents[i] \
+                Zhazard[j_South:j_North, i_West:i_East] += descendants[i] \
                     * Zflow_local_array[i, 0:j_North-j_South, 0:i_East-i_West]
 
     if sys.version_info >= (3, 0):
@@ -2356,7 +2355,8 @@ try:
 
         ud_file.write(
             'Masking,Union Area, Intersection Area, Fitting Parameter, ' +
-            'Vol1 in intersection, Vol2 in intersection, Thickness relative error'
+            'Vol1 in intersection, Vol2 in intersection, ' +
+            'Thickness relative error'
             + '\n')
         ud_file.write(str(1.0) + ' , ')
         ud_file.write(str(area_union) + ' , ' + str(area_inters) + ' , ')
