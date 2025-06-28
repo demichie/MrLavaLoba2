@@ -270,17 +270,16 @@ Now you are ready to compile.
     ```bash
     make
     ```
-    If all steps were done correctly, the compilation will proceed without errors. An executable file (e.g., `mr_lava_loba.x`) will be created in the `src` directory or a parent directory.
+    If all steps were done correctly, the compilation will proceed without errors. An executable file (`mr_lava_loba`) will be created in the `src` directory.
 
 ### 5.2. Running a Fortran Simulation
 
 Unlike the Python version, you run the compiled executable directly from the command line.
 
-1.  The Fortran version will likely require an input file, similar to the `input_data.py` file but in a simple text format. Check the `FORTRAN/EXAMPLES` directory for examples of how to structure this input file.
+1.  The Fortran version will likely require an input file `mr_lava_loba.inp`, similar to the `input_data.py` file but in a simple text format. Check the `FORTRAN/EXAMPLES` directory for examples of how to structure this input file.
 2.  To run a simulation, you would typically execute a command like:
     ```bash
-    ./mr_lava_loba.x name_of_your_input_file.txt
+    ./mr_lava_loba
     ```
-    (The exact command and executable name may vary. Refer to the specific examples provided with the Fortran code.)
-
+    
 Remember to set the `LD_LIBRARY_PATH` (Step 4) in any new terminal session before running the executable.
