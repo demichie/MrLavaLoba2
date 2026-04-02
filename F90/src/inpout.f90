@@ -487,7 +487,7 @@ CONTAINS
       ! If not provided in the input file, use total_volume as the default
       ! upper activation bound for each source
       WHERE ( source_volume_to(1:n_sources) == -9999.0_wp )
-         source_volume_to(1:n_sources) = total_volume
+         source_volume_to(1:n_sources) = 1.01_wp*total_volume
       END WHERE
 
       ! Check that each source activation interval is valid
@@ -505,7 +505,7 @@ CONTAINS
 
       ! Check that source activation bounds do not exceed the total erupted volume
       IF ( ANY( source_volume_from(1:n_sources) > total_volume ) .OR. &
-         ANY( source_volume_to(1:n_sources)   > total_volume ) ) THEN
+         ANY( source_volume_to(1:n_sources)   > (1.01_wp*total_volume) ) ) THEN
          WRITE(*,*) 'ERROR: source activation volume bounds must not exceed total_volume'
          STOP
       END IF
