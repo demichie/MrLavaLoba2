@@ -1,9 +1,16 @@
 # Define the compiler and flags
 FC = gfortran
-NETCDF = /home/mattia/anaconda3
+NETCDF = /home/mattia/miniconda3/envs/fortran_env
 
-FFLAGS_OBJ = -Ofast -funroll-all-loops -Wall -I$(NETCDF)/include 
-FFLAGS = -Ofast -funroll-all-loops -Wall
+#FFLAGS_OBJ = -Ofast -funroll-all-loops -Wall -I$(NETCDF)/include 
+#FFLAGS = -Ofast -funroll-all-loops -Wall
+
+FFLAGS_OBJ = -O3 -march=native -flto -Wall -I$(NETCDF)/include
+FFLAGS     = -O3 -march=native -flto -Wall
+
+
+#FFLAGS_OBJ = -O2 -pg -Wall -I$(NETCDF)/include
+#FFLAGS     = -O2 -pg -Wall
 
 FLIBS = -L$(NETCDF)/lib -lnetcdff -lnetcdf
 

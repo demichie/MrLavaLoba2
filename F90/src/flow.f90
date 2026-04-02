@@ -91,6 +91,9 @@ MODULE flow
 
    REAL(wp) :: inv_cell
 
+   !> Cumulative erupted volume already emplaced before the current flow
+   REAL(wp) :: Vcum_emplaced
+
 CONTAINS
 
    !***********************************************************************
@@ -248,6 +251,7 @@ CONTAINS
       USE parameters, ONLY : min_n_lobes, max_n_lobes
       USE parameters, ONLY : thickness_ratio, avg_lobe_thickness
       USE parameters, ONLY : lobe_exponent
+      USE parameters, ONLY : lobe_area
 
       IMPLICIT NONE
 
@@ -287,6 +291,7 @@ CONTAINS
       Ztot(1:ny,1:nx) = Ztopo(1:ny,1:nx)
       Zflow(1:ny,1:nx) = 0.0_wp
       n_lobes_tot = 0
+      Vcum_emplaced = 0.0_wp
 
       WRITE(*,*) 'Computing flow'
       call random_seed()  ! Initialize the random number generator
@@ -381,6 +386,9 @@ CONTAINS
                + filling_parameter(j_South:j_North-1, i_West:i_East-1)              &
                * lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
 
+            ! Update the cumulative erupted volume with the new deposited lobe
+            Vcum_emplaced = Vcum_emplaced + lobe_thickness * lobe_area
+
             ! store the bounding box of the new lobe
             jNorth_array(i) = j_North
             jSouth_array(i) = j_South
@@ -442,7 +450,6 @@ CONTAINS
 
             END IF
 
-
             CALL step1(xi, ix, yi, iy, x(idx), y(idx), x1(idx), x2(idx),          &
                angle(idx), slope, max_slope_angle, zidx)
 
@@ -483,6 +490,9 @@ CONTAINS
                + filling_parameter(j_South:j_North-1, i_West:i_East-1)          &
                * lobe_thickness * Zflow_local(1:ny_local,1:nx_local)
 
+            ! Update the cumulative erupted volume with the new deposited lobe
+            Vcum_emplaced = Vcum_emplaced + lobe_thickness * lobe_area
+
             ! store the bounding box of the new lobe
             jNorth_array(i) = j_North
             jSouth_array(i) = j_South
@@ -493,6 +503,9 @@ CONTAINS
          END DO
 
       END DO
+
+      WRITE(*,'(A)') ' '
+      WRITE(*,'(A,ES18.10)') ' Final cumulative deposited volume = ', Vcum_emplaced
 
       RETURN
 
@@ -788,7 +801,6 @@ CONTAINS
       USE parameters, ONLY : x_source_end, y_source_end
       USE parameters, ONLY : vent_flag
       USE parameters, ONLY : n_flows
-      USE parameters, ONLY : cell
       USE parameters, ONLY : source_volume_from, source_volume_to
       USE parameters, ONLY : source_probabilities
 
@@ -811,7 +823,7 @@ CONTAINS
       REAL(wp) :: Vcum
 
       ! Cumulative erupted volume already emplaced before the current flow
-      Vcum = cell * cell * SUM( Zflow )
+      Vcum = Vcum_emplaced
 
       ! Identify which sources are active at the current cumulative erupted volume
       ALLOCATE(source_is_active(n_sources))
@@ -1249,6 +1261,10 @@ CONTAINS
    !! coordinates are returned in the arrays `xe` and `ye`, which contain
    !! the discretized boundary points of the ellipse.
    !!
+   !! Compared with the previous implementation, this version avoids the
+   !! temporary arrays used for the scaled coordinates and computes the
+   !! rotated ellipse coordinates directly.
+   !!
    !! @param[in]  xc     X coordinate of the ellipse center.
    !! @param[in]  yc     Y coordinate of the ellipse center.
    !! @param[in]  ax1    Semi-axis of the ellipse along the major direction
@@ -1271,59 +1287,56 @@ CONTAINS
       implicit none
 
       ! Input parameters
-      real(wp), intent(in) :: xc, yc    ! Center of the ellipse
-      real(wp), intent(in) :: ax1, ax2  ! Semi-axes of the ellipse
-      real(wp), intent(in) :: angle     ! Rotation angle in degrees
+      real(wp), intent(in) :: xc, yc
+      real(wp), intent(in) :: ax1, ax2
+      real(wp), intent(in) :: angle
 
       ! Output parameters
-      real(wp), intent(out) :: xe(npoints), ye(npoints) ! Ellipse coordinates
+      real(wp), intent(out) :: xe(npoints), ye(npoints)
 
       ! Local variables
       real(wp) :: cos_angle, sin_angle
-      real(wp) :: X(npoints), Y(npoints)
 
       ! Compute the sine and cosine of the angle
       cos_angle = cosd(angle)
       sin_angle = sind(angle)
 
-      X(1:npoints) = ax1 * X_circle(1:npoints)
-      Y(1:npoints) = ax2 * Y_circle(1:npoints)
+      ! Compute the rotated ellipse coordinates directly, avoiding
+      ! temporary arrays for the scaled unit-circle coordinates
+      xe(1:npoints) = xc + ax1 * X_circle(1:npoints) * cos_angle -      &
+         ax2 * Y_circle(1:npoints) * sin_angle
 
-      xe(1:npoints) = xc + X(1:npoints) * cos_angle - Y(1:npoints) * sin_angle
-      ye(1:npoints) = yc + X(1:npoints) * sin_angle + Y(1:npoints) * cos_angle
+      ye(1:npoints) = yc + ax1 * X_circle(1:npoints) * sin_angle +      &
+         ax2 * Y_circle(1:npoints) * cos_angle
 
       RETURN
 
    end subroutine ellipse
 
    !***********************************************************************
-   !> @brief Compute the local cell-area fraction covered by a rotated ellipse.
+   !> @brief Compute the fraction of each local cell covered by the ellipse.
    !!
-   !! Evaluates, for each cell of a local subgrid, the fraction of cell area
-   !! covered by an ellipse centered at `(xc_e, yc_e)`, with semi-axes
-   !! `ax1` and `ax2`, rotated by `angle` degrees.
+   !! This routine evaluates the fraction of area covered by the ellipse in
+   !! each cell of a local window. The coverage is estimated using the
+   !! precomputed quadrature/sample points stored in xv and yv.
    !!
-   !! The computation is performed by testing a set of precomputed sampling
-   !! points within each cell against the ellipse equation in rotated
-   !! coordinates. For each local cell, the covered-area fraction is then
-   !! obtained as the ratio between the number of sampling points falling
-   !! inside the ellipse and the total number of sampling points.
+   !! Compared with the original implementation, this version avoids the
+   !! allocation and traversal of large temporary 2D arrays. The test for
+   !! point inclusion inside the ellipse is performed on the fly, and the
+   !! number of points inside the ellipse is accumulated directly for each
+   !! local cell.
    !!
-   !! @param[in]  Xc_local    X coordinates of the sampling points or cell
-   !!                         centers of the local subgrid.
-   !! @param[in]  Yc_local    Y coordinates of the sampling points or cell
-   !!                         centers of the local subgrid.
+   !! @param[in]  Xc_local    Local X coordinates of the cell centers.
+   !! @param[in]  Yc_local    Local Y coordinates of the cell centers.
    !! @param[in]  xc_e        X coordinate of the ellipse center.
    !! @param[in]  yc_e        Y coordinate of the ellipse center.
-   !! @param[in]  ax1         Semi-axis of the ellipse along the major
-   !!                         direction before rotation.
-   !! @param[in]  ax2         Semi-axis of the ellipse along the minor
-   !!                         direction before rotation.
+   !! @param[in]  ax1         Semi-axis of the ellipse along the major axis.
+   !! @param[in]  ax2         Semi-axis of the ellipse along the minor axis.
    !! @param[in]  angle       Rotation angle of the ellipse, in degrees.
    !! @param[out] area_fract  Fraction of each local cell covered by the
    !!                         ellipse.
-   !! @param[in]  nx_cell     Number of cells in the local x direction.
-   !! @param[in]  ny_cell     Number of cells in the local y direction.
+   !! @param[in]  nx_cell     Number of local cells in the X direction.
+   !! @param[in]  ny_cell     Number of local cells in the Y direction.
    !!
    !! @date 2026-04-02
    !! @author M. de' Michieli Vitturi
@@ -1345,20 +1358,14 @@ CONTAINS
 
       ! Local variables
       REAL(wp) :: c, s, c1, s1, c2, s2
-      REAL(wp) :: Xc_local_1d(nx_cell*ny_cell), Yc_local_1d(nx_cell*ny_cell)
-      REAL(wp) :: c1xv_p_s1yv(nv2), c2yv_m_s2yv(nv2)
-
-      ! REAL(wp) :: term_tot(nx_cell*ny_cell, nv2)
-      REAL(wp) :: term_tot(nv2,nx_cell*ny_cell)
-
-      ! LOGICAL :: inside(nx_cell*ny_cell, nv2)
-      LOGICAL :: inside(nv2, nx_cell*ny_cell)
-
-      REAL(wp) :: area_fract_1d_temp(nx_cell*ny_cell)
-      REAL(wp) :: xv_temp(nv2) , yv_temp(nv2)
-      REAL(wp) :: xc_i , yc_i
-
-      INTEGER :: i
+      REAL(wp) :: c1xv_p_s1yv(nv2), c2yv_m_s2xv(nv2)
+      REAL(wp) :: c1xv_p_s1yv_2(nv2), c2yv_m_s2xv_2(nv2)
+      REAL(wp) :: alpha_e, beta_e
+      REAL(wp) :: xc_i, yc_i
+      REAL(wp) :: shift1, shift2, base_term, term_val
+      INTEGER :: i, j, k, n_inside
+      REAL(wp) :: a_k, b_k
+      REAL(wp) :: u, v
 
       ! Compute cosine and sine of the angle
       c = cosd(angle)
@@ -1370,53 +1377,53 @@ CONTAINS
       c2 = c / ax2
       s2 = s / ax2
 
-      ! Translate xv and yv with respect to ellipse center
-      xv_temp = xv - xc_e
-      yv_temp = yv - yc_e
+      ! Precompute the contribution of the ellipse center
+      alpha_e = c1 * xc_e + s1 * yc_e
+      beta_e  = c2 * yc_e - s2 * xc_e
 
-      ! Flatten the Xc_local and Yc_local arrays
-      Xc_local_1d(1:nx_cell*ny_cell) = [Xc_local(1:ny_cell,1:nx_cell)]
-      Yc_local_1d(1:nx_cell*ny_cell) = [Yc_local(1:ny_cell,1:nx_cell)]
+      ! Precompute the terms depending only on the sample-point coordinates
+      c1xv_p_s1yv = c1 * xv + s1 * yv - alpha_e
+      c2yv_m_s2xv = c2 * yv - s2 * xv - beta_e
 
-      ! Compute c1*xv + s1*yv and c2*yv - s2*xv
-      c1xv_p_s1yv = c1 * xv_temp + s1 * yv_temp
-      c2yv_m_s2yv = c2 * yv_temp - s2 * xv_temp
+      ! Precompute the squared terms depending only on the sample-point coordinates
+      c1xv_p_s1yv_2 = c1xv_p_s1yv * c1xv_p_s1yv
+      c2yv_m_s2xv_2 = c2yv_m_s2xv * c2yv_m_s2xv
 
-      DO i = 1, nx_cell*ny_cell
+      ! For each local cell, count directly how many sample points fall
+      ! inside the ellipse
+      DO j = 1, nx_cell
+         DO i = 1, ny_cell
 
-         xc_i = Xc_local_1d(i)
-         yc_i = Yc_local_1d(i)
+            xc_i = Xc_local(i,j)
+            yc_i = Yc_local(i,j)
 
-         term_tot(:,i) = c1xv_p_s1yv(:) * (c1xv_p_s1yv(:) + 2.0_wp *              &
-            ( xc_i * c1 + yc_i * s1 ) ) + c2yv_m_s2yv(:) * ( c2yv_m_s2yv(:) +   &
-            2.0_wp * (  yc_i * c2 - xc_i * s2 ) ) +  (c1 * xc_i + s1 * yc_i)**2 &
-            + ( s2 * xc_i - c2 * yc_i )**2
+            u = c1 * xc_i + s1 * yc_i
+            v = yc_i * c2 - xc_i * s2
 
+            shift1 = 2.0_wp * u
+            shift2 = 2.0_wp * v
+
+            base_term = u * u + v * v
+
+            n_inside = 0
+
+            DO k = 1, nv2
+
+               a_k = c1xv_p_s1yv(k)
+               b_k = c2yv_m_s2xv(k)
+
+               term_val = c1xv_p_s1yv_2(k) + shift1 * a_k +                     &
+                  c2yv_m_s2xv_2(k) + shift2 * b_k + base_term
+
+               IF (term_val <= 1.0_wp) n_inside = n_inside + 1
+
+            END DO
+
+            ! Convert the number of inside points into area fraction
+            area_fract(i,j) = REAL(n_inside, wp) * inv_nv2
+
+         END DO
       END DO
-
-      ! Determine which points are inside the ellipse
-      inside = (term_tot <= 1.0_wp)
-
-      ! Calculate the fraction of area covered by the ellipse
-      area_fract_1d_temp = SUM(MERGE(1, 0, inside), dim=1) * inv_nv2
-
-      area_fract(1:ny_cell,1:nx_cell) = RESHAPE(area_fract_1d_temp ,              &
-         [ny_cell, nx_cell])
-
-      ! Print the array with 2 decimal places
-!!$    write(*,*)
-!!$    do i = 1, ny_cell
-!!$       do j = 1, nx_cell
-!!$          if (j < nx_cell) then
-!!$             write(*,'(F6.2, 1X)', advance='no') area_fract(i, j)
-!!$          else
-!!$             write(*,'(F6.2)', advance='no') area_fract(i, j)
-!!$          end if
-!!$       end do
-!!$       write(*,*) ! Newline after each row
-!!$    end do
-!!$    write(*,*)
-!!$    read(*,*)
 
       RETURN
 
@@ -1594,29 +1601,25 @@ CONTAINS
    end subroutine step0
 
    !***********************************************************************
-   !> @brief Evaluate the local slope beneath a lobe using its boundary elevations.
+   !> @brief Compute local slope and downslope direction for a new lobe.
    !!
-   !! Computes the interpolated elevation at the lobe center and along the
-   !! boundary of the ellipse defined by the input geometry. The boundary is
-   !! generated with `ellipse`, and the topographic elevation is interpolated
-   !! from `Ztot` at each boundary point.
-   !!
-   !! The subroutine then identifies the boundary point with minimum
-   !! elevation and uses the elevation difference between the lobe center
-   !! and that point to compute the local downslope magnitude. The
-   !! corresponding downslope direction is returned as an azimuth in degrees.
+   !! This routine interpolates the elevation at the lobe center and along
+   !! the boundary of the ellipse representing the lobe footprint. The point
+   !! on the ellipse with minimum elevation is identified and used to compute
+   !! both the local slope magnitude and the azimuth of the maximum
+   !! downslope direction.
    !!
    !! @param[in]  xi               X coordinate of the lobe center in grid
    !!                              coordinates.
-   !! @param[in]  ix               X index of the grid cell containing the
-   !!                              lobe center.
+   !! @param[in]  ix               X index of the cell containing the lobe
+   !!                              center.
    !! @param[in]  yi               Y coordinate of the lobe center in grid
    !!                              coordinates.
-   !! @param[in]  iy               Y index of the grid cell containing the
-   !!                              lobe center.
-   !! @param[in]  x_idx            X coordinate of the lobe center in physical
+   !! @param[in]  iy               Y index of the cell containing the lobe
+   !!                              center.
+   !! @param[in]  x_idx            X coordinate of the lobe center in map
    !!                              coordinates.
-   !! @param[in]  y_idx            Y coordinate of the lobe center in physical
+   !! @param[in]  y_idx            Y coordinate of the lobe center in map
    !!                              coordinates.
    !! @param[in]  ax1              Semi-axis of the lobe along the major
    !!                              direction.
@@ -1649,71 +1652,78 @@ CONTAINS
       real(wp), intent(out) :: slope, max_slope_angle, zidx
 
       ! Local variables
-      integer :: ix1, iy1, idx_min, i
+      integer :: ix1, iy1, i, i_min
       real(wp) :: xi_fract, yi_fract
       real(wp) :: xe(npoints), ye(npoints), ze(npoints)
-      !real(wp) :: xei(npoints), yei(npoints)
-      !integer :: ixe(npoints), iye(npoints), ixe1(npoints), iye1(npoints)
-      !real(wp) :: xei_fract(npoints), yei_fract(npoints)
 
       real(wp) :: xei, yei
       integer :: ixe, iye, ixe1, iye1
       real(wp) :: xei_fract, yei_fract
 
       real(wp) :: Fx_lobe, Fy_lobe
+      real(wp) :: ze_min
 
       ! Incremented indices
       ix1 = ix + 1
       iy1 = iy + 1
 
-      ! Compute the baricentric coordinates of the lobe center in the pixel
+      ! Compute the barycentric coordinates of the lobe center within the pixel
       xi_fract = xi - ix + 1.0_wp
       yi_fract = yi - iy + 1.0_wp
 
-      ! Interpolate the elevation at the corners of the pixel to find the
-      ! elevation at the lobe center
-      zidx = xi_fract * (yi_fract*Ztot(iy1, ix1) + (1.0-yi_fract) *               &
-         Ztot(iy, ix1)) + (1.0-xi_fract) * (yi_fract*Ztot(iy1, ix) +            &
-         (1.0-yi_fract) * Ztot(iy, ix))
+      ! Interpolate the elevation at the pixel corners to obtain the elevation
+      ! at the lobe center
+      zidx = xi_fract * (yi_fract * Ztot(iy1, ix1) +                              &
+         (1.0_wp - yi_fract) * Ztot(iy, ix1)) +                                   &
+         (1.0_wp - xi_fract) * (yi_fract * Ztot(iy1, ix) +                        &
+         (1.0_wp - yi_fract) * Ztot(iy, ix))
 
-      ! Compute the points of the lobe
+      ! Compute the points of the lobe boundary
       call ellipse(x_idx, y_idx, ax1, ax2, angle, xe, ye)
 
-      ! Interpolate the grid values to find the elevation at the ellipse points
+      ! Initialize the minimum elevation found along the ellipse boundary
+      ze_min = huge(1.0_wp)
+      i_min = 1
+
+      ! Interpolate the topography at the ellipse boundary points and track
+      ! the point with minimum elevation while scanning the boundary
       DO i = 1, npoints
 
-         ! Compute the indices of the pixels containing the ellipse points
+         ! Compute the indices of the pixel containing the current ellipse point
          xei = (xe(i) - xcmin) * inv_cell
          yei = (ye(i) - ycmin) * inv_cell
 
          ixe = ceiling(xei)
          iye = ceiling(yei)
 
-         ! Compute the local coordinates of the points within the pixels containing
-         ! them
+         ! Compute the local coordinates of the point within the containing pixel
          xei_fract = xei - ixe + 1.0_wp
          yei_fract = yei - iye + 1.0_wp
 
          ixe1 = ixe + 1
          iye1 = iye + 1
 
+         ! Bilinear interpolation of the topography at the ellipse point
          ze(i) = xei_fract * (yei_fract * Ztot(iye1, ixe1) +                      &
-            (1.0_wp - yei_fract) * Ztot(iye, ixe1)) +                           &
-            (1.0_wp - xei_fract) * (yei_fract * Ztot(iye1, ixe) +               &
+            (1.0_wp - yei_fract) * Ztot(iye, ixe1)) +                             &
+            (1.0_wp - xei_fract) * (yei_fract * Ztot(iye1, ixe) +                 &
             (1.0_wp - yei_fract) * Ztot(iye, ixe))
+
+         ! Update the minimum boundary elevation and its index
+         if (ze(i) < ze_min) then
+            ze_min = ze(i)
+            i_min = i
+         end if
 
       END DO
 
-      ! Find the point on the ellipse with minimum elevation
-      idx_min = minloc(ze,DIM=1)
+      ! Compute the vector from the lobe center to the boundary point with
+      ! minimum elevation
+      Fx_lobe = x_idx - xe(i_min)
+      Fy_lobe = y_idx - ye(i_min)
 
-      ! Compute the vector from the center of the lobe to the point of minimum
-      ! elevation on the boundary
-      Fx_lobe = x_idx - xe(idx_min)
-      Fy_lobe = y_idx - ye(idx_min)
-
-      ! Compute the slope and the angle
-      slope = max(0.0_wp, (zidx - ze(idx_min)) / sqrt(Fx_lobe**2 + Fy_lobe**2))
+      ! Compute the local slope magnitude and the maximum downslope direction
+      slope = max(0.0_wp, (zidx - ze_min) / sqrt(Fx_lobe**2 + Fy_lobe**2))
       max_slope_angle = mod(180.0_wp + atan2d(Fy_lobe, Fx_lobe), 360.0_wp)
 
       RETURN
