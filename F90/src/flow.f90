@@ -567,7 +567,7 @@ CONTAINS
 
          end do
 
-       CASE ( 2 , 3 )
+       CASE ( 2 , 3 , 6 )
 
          !> A polyline defined by n_vents points is converted into
          !> n_sources = n_vents-1 line sources
@@ -700,9 +700,9 @@ CONTAINS
             cum_source_prob(j) = REAL(j,wp) / REAL(n_sources,wp)
          end do
 
-       CASE ( 7 , 8 )
+       CASE ( 6 , 7 , 8 )
 
-         !> vent_flag = 7,8: sources selected according to user-defined
+         !> vent_flag = 6,7,8: sources selected according to user-defined
          !> probabilities
          IF ( allocated(source_probabilities) .AND. &
             ABS(source_probabilities(1) - (-9999.0_wp)) >= eps ) THEN
@@ -842,7 +842,7 @@ CONTAINS
 
          SELECT CASE ( vent_flag )
 
-          CASE ( 2 , 3, 4 , 5, 7 )
+          CASE ( 2 , 3 , 4 , 5 , 6 , 7 )
             call random_number(alfa_source)
 
             x_i = x_source(1) + alfa_source * &

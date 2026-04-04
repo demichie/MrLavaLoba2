@@ -318,7 +318,7 @@ CONTAINS
             STOP
          END IF
 
-         IF ( ( vent_flag == 7 ) .OR. ( vent_flag == 8 ) ) THEN
+         IF ( vent_flag .GE. 6 ) THEN
 
             IF ( ANY( source_probabilities(1:n_sources) == -9999.0_wp ) ) THEN
                WRITE(*,*) 'ERROR: source_probabilities must be provided for all sources'
@@ -404,7 +404,7 @@ CONTAINS
 
          ELSE
 
-            IF ( vent_flag .EQ. 7 ) THEN
+            IF ( vent_flag .GE. 6 ) THEN
 
                WRITE(*,*)
                WRITE(*,*) 'ERROR: problem with namelist VENT_PARAMETERS'
