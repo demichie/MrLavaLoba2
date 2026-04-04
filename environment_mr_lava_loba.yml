@@ -1,0 +1,17 @@
+name: mr-lava-loba
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - pandas
+  - numba
+  - shapely
+  - pyshp
+  - netcdf-fortran
+  - netcdf4
+  - libnetcdf
+  - fortran-compiler
+  - make
+  
