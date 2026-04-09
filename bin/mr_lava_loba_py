@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT="$REPO_DIR/PYTHON/src/mr_lava_loba.py"
+
+exec python "$SCRIPT" "$@"

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+EXEC="$REPO_DIR/F90/src/mr_lava_loba"
+
+if [ ! -x "$EXEC" ]; then
+  echo "Fortran executable not found. Compile it first with:"
+  echo "  cd $REPO_DIR/F90/src && make"
+  exit 1
+fi
+
+exec "$EXEC" "$@"
+
