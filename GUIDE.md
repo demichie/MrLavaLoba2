@@ -168,27 +168,27 @@ As a consequence, probability arrays and activation arrays must be dimensioned u
 | `7` | Independent fissures with start/end pairs | Independent fissures | `n_vents` | User-defined probability choice among active fissures | Supported |
 | `8` | Point vents `x_vent(i), y_vent(i)` | Point sources | `n_vents` | User-defined probability choice among active point sources | Supported |
 
-The source-based geometric and activation logic for `vent_flag = 0, 1, 2, 3, 4, 5, 7, 8` is described in the source-geometry technical summary, while `vent_flag = 6` extends the same design by introducing the polyline analogue of the user-defined probability mode. fileciteturn25file0
+The source-based geometric and activation logic for `vent_flag = 0, 1, 2, 3, 4, 5, 7, 8` is described in the source-geometry technical summary, while `vent_flag = 6` extends the same design by introducing the polyline analogue of the user-defined probability mode.
 
 ### 6.3 Detailed behaviour by vent_flag
 
 #### `vent_flag = 0`
-A set of point vents. Each discrete source entity coincides with one vent. The active subset is first identified, then the flow index is mapped deterministically to one active source. Deterministic cycling therefore occurs over the active source set only. fileciteturn25file0
+A set of point vents. Each discrete source entity coincides with one vent. The active subset is first identified, then the flow index is mapped deterministically to one active source. Deterministic cycling therefore occurs over the active source set only.
 
 #### `vent_flag = 1`
-Also a point-vent configuration, but the source is selected randomly with uniform probability among the currently active point sources. fileciteturn25file0
+Also a point-vent configuration, but the source is selected randomly with uniform probability among the currently active point sources.
 
 #### `vent_flag = 2`
-The input coordinates define a polyline. The sampled source entities are the consecutive segments. Segment selection is weighted by segment length. The code samples only among the active segments, then samples a point uniformly along the chosen segment. fileciteturn25file0
+The input coordinates define a polyline. The sampled source entities are the consecutive segments. Segment selection is weighted by segment length. The code samples only among the active segments, then samples a point uniformly along the chosen segment.
 
 #### `vent_flag = 3`
-Same polyline geometry as `2`, but all active segments are weighted uniformly. After selecting a segment, the emplacement point is sampled uniformly along that segment. fileciteturn25file0
+Same polyline geometry as `2`, but all active segments are weighted uniformly. After selecting a segment, the emplacement point is sampled uniformly along that segment.
 
 #### `vent_flag = 4`
-Independent fissures are represented directly as source entities. Selection is weighted by fissure length, restricted to the active subset. The emplacement point is then sampled uniformly along the chosen fissure. fileciteturn25file0
+Independent fissures are represented directly as source entities. Selection is weighted by fissure length, restricted to the active subset. The emplacement point is then sampled uniformly along the chosen fissure.
 
 #### `vent_flag = 5`
-Same independent-fissure geometry as `4`, but with uniform weights over the active fissures. fileciteturn25file0
+Same independent-fissure geometry as `4`, but with uniform weights over the active fissures.
 
 #### `vent_flag = 6`
 The input coordinates define a polyline, and the sampled source entities are again the consecutive polyline segments. Unlike `2`, the relative probability of each segment is **provided directly by the user** through `source_probabilities`. During source selection, those probabilities are restricted to the currently active subset of segments, renormalized over that subset, and used to sample the active segment. After selecting the segment, the emplacement point is sampled uniformly along it.
@@ -196,10 +196,10 @@ The input coordinates define a polyline, and the sampled source entities are aga
 This mode is the polyline equivalent of `vent_flag = 7` and is fully consistent with the source-based architecture and activation-window logic.
 
 #### `vent_flag = 7`
-Independent fissures with user-defined probabilities. The source probabilities are restricted to the active fissures only, and the emplacement point is sampled uniformly along the selected fissure. fileciteturn25file0
+Independent fissures with user-defined probabilities. The source probabilities are restricted to the active fissures only, and the emplacement point is sampled uniformly along the selected fissure.
 
 #### `vent_flag = 8`
-Point vents with user-defined probabilities. The source probabilities are restricted to the active point vents only. No secondary sampling along a segment is needed because the sources are points. fileciteturn25file0
+Point vents with user-defined probabilities. The source probabilities are restricted to the active point vents only. No secondary sampling along a segment is needed because the sources are points.
 
 ### 6.4 Source activation windows
 
@@ -217,7 +217,8 @@ Each source can be assigned a lower and upper activation bound:
 source_volume_from(i) <= Vcum < source_volume_to(i)
 ```
 
-A source is considered active only when this condition is satisfied. If multiple sources are active at the same cumulative volume, the usual selection rule for the chosen `vent_flag` is applied only to that active subset. If no source is active, the code stops with an explicit error. The activation-window mechanism is described in the source-based technical summary. fileciteturn25file0
+A source is considered active only when this condition is satisfied. If multiple sources are active at the same cumulative volume, the usual selection rule for the chosen `vent_flag` is applied only to that active subset. If no source is active, the code stops with an explicit error. The activation-window mechanism is described in the source-based technical summary. 
+
 
 ### 6.5 Input representation for activation windows
 
@@ -241,7 +242,7 @@ so that all sources remain active for the entire simulation. The current input v
 
 - the bounds are non-negative
 - they do not exceed `total_volume`
-- `source_volume_from <= source_volume_to` for every source fileciteturn25file0
+- `source_volume_from <= source_volume_to` for every source
 
 ### 6.6 Example of activation windows
 
@@ -256,7 +257,7 @@ In this case:
 - source 2 is active between `300000` and `600000`
 - source 3 is active between `600000` and `1000000`
 
-Overlapping windows are also allowed. When more than one source is active, the code applies the usual source-selection rule of the chosen `vent_flag` to the active subset only. fileciteturn25file0
+Overlapping windows are also allowed. When more than one source is active, the code applies the usual source-selection rule of the chosen `vent_flag` to the active subset only. 
 
 ## 7. Python input parameters
 
