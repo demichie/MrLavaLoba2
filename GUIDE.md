@@ -453,7 +453,3 @@ bash scripts/install_conda_hooks.sh
 ```
 
 from the new repository location.
-
-## 13. References
-
-Add here the main software and scientific references associated with the code.
