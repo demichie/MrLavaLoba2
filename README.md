@@ -251,6 +251,3 @@ Redistributions of source code and modified versions should preserve the origina
 authorship and attribution notices contained in the source files, NOTICE file,
 AUTHORS file, and citation metadata.
 
-## Citation
-
-Add citation information here if the code is associated with a paper or software release.
