@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: "If you use MrLavaLoba2, please cite it using the metadata below."
+title: "MrLavaLoba2"
+type: software
+authors:
+  - family-names: "de' Michieli Vitturi"
+    given-names: "Mattia"
+    affiliation: "Istituto Nazionale di Geofisica e Vulcanologia (INGV), Sezione di Pisa"
+    address: "Via Cesare Battisti, 53, 56125 Pisa, Italy"
+  - family-names: "Tarquini"
+    given-names: "Simone"
+    affiliation: "Istituto Nazionale di Geofisica e Vulcanologia (INGV), Sezione di Pisa"
+    address: "Via Cesare Battisti, 53, 56125 Pisa, Italy"
+abstract: >
+  MrLavaLoba2 is a stochastic lava-flow simulation code implementing lobe-based
+  emplacement over a digital elevation model, available in Python and Fortran versions.
+repository-code: "https://github.com/demichie/MrLavaLoba2"
+url: "https://github.com/demichie/MrLavaLoba2"
+license: "Apache-2.0"
+keywords:
+  - lava flow
+  - volcanology
+  - hazard assessment
+  - stochastic model
+  - DEM
+version: "REPLACE_WITH_RELEASE_VERSION"
+date-released: "REPLACE_WITH_RELEASE_DATE"
+doi: "10.5281/zenodo.REPLACE_WITH_ZENODO_DOI"
+preferred-citation:
+  type: software
+  title: "MrLavaLoba2"
+  authors:
+    - family-names: "de' Michieli Vitturi"
+      given-names: "Mattia"
+      affiliation: "Istituto Nazionale di Geofisica e Vulcanologia (INGV), Sezione di Pisa"
+    - family-names: "Tarquini"
+      given-names: "Simone"
+      affiliation: "Istituto Nazionale di Geofisica e Vulcanologia (INGV), Sezione di Pisa"
+  version: "REPLACE_WITH_RELEASE_VERSION"
+  doi: "10.5281/zenodo.REPLACE_WITH_ZENODO_DOI"

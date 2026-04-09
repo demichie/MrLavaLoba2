@@ -1,3 +1,13 @@
+# MrLavaLoba2
+# Copyright (c) Mattia de' Michieli Vitturi and Simone Tarquini
+# Licensed under the Apache License, Version 2.0
+# Original authors:
+#   Mattia de' Michieli Vitturi
+#   Simone Tarquini
+# Affiliation:
+#   Istituto Nazionale di Geofisica e Vulcanologia (INGV), Sezione di Pisa
+
+
 # from numba import jit
 
 import os

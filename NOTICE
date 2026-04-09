@@ -1,0 +1,27 @@
+MrLavaLoba2
+Copyright (c) Mattia de' Michieli Vitturi and Simone Tarquini
+
+This software was originally developed by:
+
+- Mattia de' Michieli Vitturi
+- Simone Tarquini
+
+Affiliation:
+Istituto Nazionale di Geofisica e Vulcanologia (INGV), Sezione di Pisa
+Via Cesare Battisti, 53
+56125 Pisa
+ITALY
+
+MrLavaLoba2 is derived from the original MrLavaLoba code and repository lineage.
+
+Attribution notice:
+Redistributions of source code and modified versions should preserve the original
+authorship and attribution notices contained in the source files, NOTICE file,
+AUTHORS file, and citation metadata.
+
+Recommended software citation:
+Please cite the software using the repository CITATION.cff file.
+
+DOI note:
+Replace the placeholder DOI in CITATION.cff with the Zenodo DOI once a release
+has been archived.
