@@ -1,17 +1,25 @@
 # Mr Lava Loba
 
-Mr Lava Loba is a lava-flow simulation code available in two implementations:
+Mr Lava Loba is a stochastic lava-flow simulation code available in two implementations:
 
 - **Fortran** (`F90/`)
 - **Python** (`PYTHON/`)
 
-The repository also includes example cases for both versions.
+The model emplaces lava as a sequence of elliptical lobes over a digital elevation model (DEM).  
+Its main inputs are:
+
+- a **DEM** defining the computational domain
+- one or more **eruption sources / vents**
+- a set of parameters controlling flow lengthening, spreading, thickening, and total erupted volume
+
+The repository includes both source code and ready-to-run example cases.
 
 ## Repository structure
 
 ```text
 .
 ├── README.md
+├── guide.md
 ├── environment_mr_lava_loba.yml
 ├── bin/
 │   ├── mr_lava_loba_f90
@@ -33,17 +41,9 @@ The repository also includes example cases for both versions.
     └── EXAMPLES/
 ```
 
-## Requirements
-
-The project uses:
-
-- Python libraries for the Python implementation
-- a Fortran compiler for the Fortran implementation
-- NetCDF Fortran libraries for compiling the Fortran code
+## Quick installation
 
 A complete Conda environment is provided in the repository root.
-
-## Create the Conda environment
 
 From the repository root:
 
@@ -52,9 +52,7 @@ conda env create -f environment_mr_lava_loba.yml
 conda activate mr-lava-loba
 ```
 
-## Check the installation
-
-After activating the environment, verify that both Python and Fortran dependencies are available:
+Then verify that both Python and Fortran dependencies are available:
 
 ```bash
 python -c "import numpy, scipy, pandas, numba, shapely, shapefile; print('Python dependencies OK')"
@@ -64,22 +62,14 @@ nf-config --fflags
 nf-config --flibs
 ```
 
-## Install command-line launchers with Conda hooks
+## Enable command-line launchers
 
 The repository provides two launchers:
 
 - `mr_lava_loba_f90`
 - `mr_lava_loba_py`
 
-These can be made available automatically in your shell every time you run:
-
-```bash
-conda activate mr-lava-loba
-```
-
-### One-time setup
-
-From the repository root:
+To make them automatically available every time the Conda environment is activated, run:
 
 ```bash
 conda activate mr-lava-loba
@@ -88,16 +78,14 @@ conda deactivate
 conda activate mr-lava-loba
 ```
 
-Then verify that the launchers are on your `PATH`:
+Then verify:
 
 ```bash
 which mr_lava_loba_f90
 which mr_lava_loba_py
 ```
 
-### Remove the hooks
-
-If needed, you can remove the Conda hook setup with:
+To remove the hooks:
 
 ```bash
 conda activate mr-lava-loba
@@ -114,9 +102,7 @@ The Fortran source code is in:
 F90/src
 ```
 
-### Compile the Fortran code
-
-Move to the source directory and run:
+### Compile the code
 
 ```bash
 cd F90/src
@@ -124,47 +110,22 @@ make clean
 make
 ```
 
-This will build the executable:
+This builds the executable:
 
 ```text
 mr_lava_loba
 ```
 
-### Notes on the Makefile
+### Run a Fortran example
 
-The `Makefile` is expected to use `nf-config` to retrieve the correct NetCDF include and link flags from the active Conda environment.
-
-A typical workflow is:
-
-```bash
-conda activate mr-lava-loba
-cd F90/src
-make clean
-make
-```
-
-### macOS / Apple Silicon note
-
-On Apple Silicon (`arm64`), `-flto` may fail with an error involving `lto1`. If this happens, disable `-flto` in the `Makefile`, or use a `Makefile` that automatically disables it on `Darwin arm64`.
-
-A warning such as:
-
-```text
-ld: warning: duplicate -rpath '.../lib' ignored
-```
-
-is usually harmless and does not prevent successful compilation.
-
-### Run the Fortran version
-
-After the hooks are installed and the code is compiled, move to an example directory and run:
+After compilation, move to an example directory and run:
 
 ```bash
 cd F90/EXAMPLES/<case_directory>
 mr_lava_loba_f90
 ```
 
-The launcher executes the compiled binary located in `F90/src/`, while using the current example directory as the working directory.
+The launcher runs the compiled binary from `F90/src/` while using the current example directory as the working directory.
 
 ## Python version
 
@@ -176,16 +137,14 @@ PYTHON/src
 
 The example directories in `PYTHON/EXAMPLES/` are intended to contain the case-specific input files and datasets.
 
-### Run the Python version
-
-After the hooks are installed, move to a Python example directory and run:
+### Run a Python example
 
 ```bash
 cd PYTHON/EXAMPLES/<case_directory>
 mr_lava_loba_py
 ```
 
-The launcher executes `PYTHON/src/mr_lava_loba.py`, while using the current example directory as the working directory.
+The launcher runs `PYTHON/src/mr_lava_loba.py` while using the current example directory as the working directory.
 
 ## Examples
 
@@ -197,7 +156,7 @@ Both implementations include example cases:
 These folders can be used to:
 
 - test that the installation works correctly
-- inspect the expected input-file structure
+- inspect the expected case structure
 - compare the Fortran and Python workflows
 
 A recommended first test is:
@@ -208,26 +167,41 @@ A recommended first test is:
 4. run one of the example cases in `F90/EXAMPLES`
 5. run one of the example cases in `PYTHON/EXAMPLES`
 
-## Suggested workflow
+## Model overview
 
-### Fortran
+Mr Lava Loba is a **stochastic lobe-based model**. The emplaced lava is represented as a set of elliptical lobes that are sequentially placed on the topography.
 
-```bash
-conda activate mr-lava-loba
-cd F90/src
-make clean
-make
-cd ../EXAMPLES/<case_directory>
-mr_lava_loba_f90
-```
+Very roughly:
 
-### Python
+- the **first lobe** is placed at the eruptive source
+- subsequent lobes are generated from previously emplaced lobes
+- the direction of propagation is influenced by the local slope and by user-defined stochastic parameters
+- repeating many lobe chains produces the final deposit
 
-```bash
-conda activate mr-lava-loba
-cd PYTHON/EXAMPLES/<case_directory>
-mr_lava_loba_py
-```
+This makes the code especially suitable for probabilistic lava-flow footprint simulations and hazard-oriented analyses.
+
+## Parameters that matter most during calibration
+
+Although the model exposes many input parameters, a small subset usually controls most of the behavior:
+
+- `n_flows`: number of simulated lobe chains
+- `min_n_lobes`, `max_n_lobes`: number of lobes per chain, strongly influencing runout
+- `lobe_area`: characteristic size of each lobe
+- `lobe_exponent`: tendency to form single chains versus branching patterns
+- `max_slope_prob`: tendency to follow the steepest descent direction
+- `thickening_parameter`: tendency to pile up versus spread laterally
+
+In practice, calibration is usually performed by varying one parameter at a time and comparing the simulation output against known lava-flow deposits.
+
+## Main outputs
+
+The most important output rasters are:
+
+- **full thickness map**: the complete simulated deposit
+- **masked thickness map**: a filtered version of the deposit, usually more useful for visualization and comparison
+- **hazard map**: a weighted flow-path frequency / relative hazard map highlighting the most persistently invaded corridors
+
+In many practical applications, the masked thickness output is the most useful map for comparing the model footprint with real lava-flow outlines.
 
 ## Troubleshooting
 
@@ -252,6 +226,14 @@ In most Conda-based setups this is handled automatically by the environment. If 
 ### The repository was moved after hook installation
 
 If you rename or move the repository directory after running `install_conda_hooks.sh`, run the install script again from the new repository location.
+
+## More detailed documentation
+
+For a longer introduction to the model, a more detailed explanation of the main parameters, the Fortran input file, and the interpretation of the outputs, see:
+
+```text
+guide.md
+```
 
 ## License
 
