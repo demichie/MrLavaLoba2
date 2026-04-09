@@ -235,9 +235,21 @@ For a longer introduction to the model, a more detailed explanation of the main 
 guide.md
 ```
 
-## License
+## Copyright
 
-Add the project license here.
+Copyright (c) Mattia de' Michieli Vitturi and Simone Tarquini
+
+This software was originally developed by:
+
+- Mattia de' Michieli Vitturi
+- Simone Tarquini
+
+MrLavaLoba2 is derived from the original MrLavaLoba code and repository lineage.
+
+Attribution notice:
+Redistributions of source code and modified versions should preserve the original
+authorship and attribution notices contained in the source files, NOTICE file,
+AUTHORS file, and citation metadata.
 
 ## Citation
 
