@@ -168,7 +168,6 @@ As a consequence, probability arrays and activation arrays must be dimensioned u
 | `7` | Independent fissures with start/end pairs | Independent fissures | `n_vents` | User-defined probability choice among active fissures | Supported |
 | `8` | Point vents `x_vent(i), y_vent(i)` | Point sources | `n_vents` | User-defined probability choice among active point sources | Supported |
 
-The source-based geometric and activation logic for `vent_flag = 0, 1, 2, 3, 4, 5, 7, 8` is described in the source-geometry technical summary, while `vent_flag = 6` extends the same design by introducing the polyline analogue of the user-defined probability mode.
 
 ### 6.3 Detailed behaviour by vent_flag
 
@@ -192,8 +191,6 @@ Same independent-fissure geometry as `4`, but with uniform weights over the acti
 
 #### `vent_flag = 6`
 The input coordinates define a polyline, and the sampled source entities are again the consecutive polyline segments. Unlike `2`, the relative probability of each segment is **provided directly by the user** through `source_probabilities`. During source selection, those probabilities are restricted to the currently active subset of segments, renormalized over that subset, and used to sample the active segment. After selecting the segment, the emplacement point is sampled uniformly along it.
-
-This mode is the polyline equivalent of `vent_flag = 7` and is fully consistent with the source-based architecture and activation-window logic.
 
 #### `vent_flag = 7`
 Independent fissures with user-defined probabilities. The source probabilities are restricted to the active fissures only, and the emplacement point is sampled uniformly along the selected fissure.
