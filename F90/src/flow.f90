@@ -362,7 +362,7 @@ CONTAINS
             CALL step1A(x(i), y(i), max_slope_angle, slope)
 
             CALL step2(slope, max_slope_angle, angle(i))
-
+            
             CALL compute_semiaxis(slope,x1(i), x2(i))
 
             CALL rasterize(x(i), y(i), x1(i), x2(i), angle(i), dist_int(i),       &
@@ -464,6 +464,7 @@ CONTAINS
 
             IF (.NOT.check_step) THEN
 
+               WRITE(*,*) 'LAST_LOBE =',i-1
                last_lobe = i-1
                EXIT
 

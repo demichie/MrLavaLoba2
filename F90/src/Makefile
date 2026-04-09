@@ -1,40 +1,43 @@
-# Define the compiler and flags
-FC = gfortran
-NETCDF = /home/mattia/miniconda3/envs/fortran_env
+FC ?= gfortran
 
-#FFLAGS_OBJ = -Ofast -funroll-all-loops -Wall -I$(NETCDF)/include 
-#FFLAGS = -Ofast -funroll-all-loops -Wall
+NF_CONFIG := $(shell which nf-config 2>/dev/null)
 
-FFLAGS_OBJ = -O3 -march=native -flto -Wall -I$(NETCDF)/include
-FFLAGS     = -O3 -march=native -flto -Wall
+ifeq ($(NF_CONFIG),)
+$(error nf-config not found. Activate the conda environment with netcdf-fortran installed)
+endif
 
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
 
-#FFLAGS_OBJ = -O2 -pg -Wall -I$(NETCDF)/include
-#FFLAGS     = -O2 -pg -Wall
+BASE_FLAGS = -O3 -Wall
+ARCH_FLAGS = -march=native
+LTO_FLAGS = -flto
 
-FLIBS = -L$(NETCDF)/lib -lnetcdff -lnetcdf
+# Disable -flto on Apple Silicon
+ifeq ($(UNAME_S),Darwin)
+  ifeq ($(UNAME_M),arm64)
+    LTO_FLAGS =
+  endif
+endif
 
-# Define the sources and objects
-SRC = parameters.f90 flow.f90 inpout.f90 mr_lava_loba.f90 
+FFLAGS_OBJ = $(BASE_FLAGS) $(ARCH_FLAGS) $(LTO_FLAGS) $(shell nf-config --fflags)
+FFLAGS     = $(BASE_FLAGS) $(ARCH_FLAGS) $(LTO_FLAGS)
+FLIBS      = $(shell nf-config --flibs)
+
+SRC = parameters.f90 flow.f90 inpout.f90 mr_lava_loba.f90
 OBJ = $(SRC:.f90=.o)
 
-# Define the executable name
 EXEC = mr_lava_loba
 
-# Default target: build the executable
 all: $(EXEC)
 
-# Rule to build the executable
 $(EXEC): $(OBJ)
-	$(FC) $(FFLAGS) -o $@ $(OBJ)  $(FLIBS)
+	$(FC) $(FFLAGS) -o $@ $(OBJ) $(FLIBS)
 
-# Rule to build object files
 %.o: %.f90
-	$(FC) $(FFLAGS_OBJ) -c $< -o $@ $(FLIBS) 
+	$(FC) $(FFLAGS_OBJ) -c $< -o $@
 
-# Clean up the build files
 clean:
 	rm -f $(OBJ) $(EXEC)
 
-# Phony targets
 .PHONY: all clean

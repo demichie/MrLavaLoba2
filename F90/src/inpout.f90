@@ -744,15 +744,17 @@ CONTAINS
 
       close(topo_unit)
 
+
+      ! Calculate cell centers
+      do i = 1, cols
+         xc_temp(i) = lx + cell * (0.5 + (i - 1))
+      end do
+      do i = 1, rows
+         yc_temp(i) = ly + cell * (0.5 + (i - 1))
+      end do
+      
       IF ( crop_flag) THEN
 
-         ! Calculate cell centers
-         do i = 1, cols
-            xc_temp(i) = lx + cell * (0.5 + (i - 1))
-         end do
-         do i = 1, rows
-            yc_temp(i) = ly + cell * (0.5 + (i - 1))
-         end do
 
          xW = MINVAL(x_vent) - west_to_vent
          xE = MAXVAL(x_vent) + east_to_vent
@@ -835,7 +837,7 @@ CONTAINS
       allocate(filling_parameter(ny,nx))
 
       filling_parameter(1:ny,1:nx) = 1.0_wp - thickening_parameter
-
+      
       RETURN
 
    END SUBROUTINE read_topo
