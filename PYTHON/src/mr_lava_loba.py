@@ -7,58 +7,59 @@
 # Affiliation:
 #   Istituto Nazionale di Geofisica e Vulcanologia (INGV), Sezione di Pisa
 
-
-# from numba import jit
-
+from collections import defaultdict
+import importlib
 import os
 import sys
 
-# Make the current working directory the first place where Python looks
-# for case-specific input files such as input_data.py
+from numba import njit
+import numpy as np
+from linecache import getline
+from scipy.stats import beta
+import time
+import numpy.ma as ma
+import shutil
+import datetime
+from os.path import exists
+import gc
+import pandas as pd
+
+
 cwd = os.getcwd()
 if cwd not in sys.path:
     sys.path.insert(0, cwd)
 
-from collections import defaultdict
-from input_data_advanced import force_max_length
-from input_data_advanced import start_from_dist_flag
-from input_data_advanced import aspect_ratio_coeff
-from input_data_advanced import max_aspect_ratio
-from input_data_advanced import b_beta
-from input_data_advanced import a_beta
-from input_data_advanced import flag_threshold
-from input_data_advanced import dist_fact
-from input_data_advanced import n_init
-from input_data_advanced import npoints
-from input_data import vent_flag
-from input_data import fixed_dimension_flag
-from input_data import thickness_ratio
-from input_data import max_slope_prob
-from input_data import lobe_exponent
-from input_data import inertial_exponent
-from input_data import lobe_area
-from input_data import thickening_parameter
-from input_data import max_n_lobes
-from input_data import min_n_lobes
-from input_data import n_flows
-from input_data import masking_threshold
-from input_data import hazard_flag
-from input_data import y_vent
-from input_data import x_vent
-from input_data import source
-from input_data import run_name
-import pandas as pd
-import gc
-from os.path import exists
-from random import randrange
-import datetime
-import shutil
-import numpy.ma as ma
-import time
-from scipy.stats import beta
-from linecache import getline
-import numpy as np
-from numba import njit
+input_data = importlib.import_module("input_data")
+input_data_advanced = importlib.import_module("input_data_advanced")
+
+run_name = input_data.run_name
+source = input_data.source
+x_vent = input_data.x_vent
+y_vent = input_data.y_vent
+hazard_flag = input_data.hazard_flag
+masking_threshold = input_data.masking_threshold
+n_flows = input_data.n_flows
+min_n_lobes = input_data.min_n_lobes
+max_n_lobes = input_data.max_n_lobes
+thickening_parameter = input_data.thickening_parameter
+lobe_area = input_data.lobe_area
+inertial_exponent = input_data.inertial_exponent
+lobe_exponent = input_data.lobe_exponent
+max_slope_prob = input_data.max_slope_prob
+thickness_ratio = input_data.thickness_ratio
+fixed_dimension_flag = input_data.fixed_dimension_flag
+vent_flag = input_data.vent_flag
+
+npoints = input_data_advanced.npoints
+n_init = input_data_advanced.n_init
+dist_fact = input_data_advanced.dist_fact
+flag_threshold = input_data_advanced.flag_threshold
+a_beta = input_data_advanced.a_beta
+b_beta = input_data_advanced.b_beta
+max_aspect_ratio = input_data_advanced.max_aspect_ratio
+aspect_ratio_coeff = input_data_advanced.aspect_ratio_coeff
+start_from_dist_flag = input_data_advanced.start_from_dist_flag
+force_max_length = input_data_advanced.force_max_length
 
 
 def initialize_topo(source):
@@ -128,40 +129,15 @@ def initialize_topo(source):
     cols = int(cols)
     rows = int(rows)
 
-    try:
+    west_to_vent = getattr(input_data, "west_to_vent", None)
+    east_to_vent = getattr(input_data, "east_to_vent", None)
+    south_to_vent = getattr(input_data, "south_to_vent", None)
+    north_to_vent = getattr(input_data, "north_to_vent", None)
 
-        from input_data import west_to_vent
-
-    except ImportError:
-
-        print("west_to_vent not defined in input file")
-
-    try:
-
-        from input_data import east_to_vent
-
-    except ImportError:
-
-        print("east_to_vent not defined in input file")
-
-    try:
-
-        from input_data import south_to_vent
-
-    except ImportError:
-
-        print("south_to_vent not defined in input file")
-
-    try:
-
-        from input_data import north_to_vent
-
-    except ImportError:
-
-        print("north_to_vent not defined in input file")
-
-    crop_flag = ("west_to_vent" in locals()) and ("east_to_vent" in locals()) \
-        and ("south_to_vent" in locals()) and ("north_to_vent" in locals())
+    crop_flag = all(
+        value is not None
+        for value in (west_to_vent, east_to_vent, south_to_vent, north_to_vent)
+    )
 
     print('west_to_vent', west_to_vent)
     print('x_vent', x_vent)
@@ -264,32 +240,35 @@ def initialize_topo(source):
     Ztopo = np.zeros((ny, nx))
     np.copyto(Ztopo, arr)
 
-    return Xc, Yc, Ztopo, xcmin, xcmax, ycmin, ycmax, cell, nx, ny, nd, lx, ly, header_topo, crop_flag, jS, jN, iW, iE
+    return (
+        Xc, Yc, Ztopo, xcmin, xcmax, ycmin, ycmax, cell, nx, ny,
+        nd, lx, ly, header_topo, crop_flag, jS, jN, iW, iE,
+    )
 
 
 def initialize_channel(Xc, Yc):
+    """Initialize the channel direction and distance fields
+
+    Parameters
+    ----------
+    Xc : float 2D array
+        x-coordinates of centers of grid cells
+    Yc : float 2D array
+        y-coordinates of centers of grid cells
+
+    Returns
+    -------
+    distxy : float 2D array
+        weighting field controlling the channel influence
+    vx : float 2D array
+        x-component of the channel direction field
+    vy : float 2D array
+        y-component of the channel direction field
+    """
 
     import shapefile
-    # from shapely.geometry import Point, LineString, MultiPoint
+    from shapely.geometry import Point, LineString
     from shapely.ops import nearest_points
-
-    try:
-
-        from input_data import alfa_channel
-        from input_data import d1
-        from input_data import d2
-        from input_data import eps
-
-    except ImportError:
-
-        print('Channel parameters not defined:')
-        print('- channel_file')
-        print('- d1')
-        print('- d2')
-        print('- eps')
-        print('- alfa_chaneel')
-
-        alfa_channel = 0.0
 
     # arrays of components of the direction vectors computer from channel
     vx = np.zeros_like(Xc)
@@ -443,10 +422,43 @@ def initialize_channel(Xc, Yc):
     print('Channel map completed')
     print('')
 
-    return distxy
+    return distxy, vx, vy
 
 
-def channel_mod_angle(old_angle):
+def channel_mod_angle(old_angle, xi_fract, yi_fract, vx, vy, distxy,
+                      iy, iy1, ix, ix1, alfa_channel):
+    """Modify the lobe direction according to the channel field
+
+    Parameters
+    ----------
+    old_angle : float
+        angle of the lobe before channel correction
+    xi_fract : float
+        x local coordinate of the lobe center within the grid cell
+    yi_fract : float
+        y local coordinate of the lobe center within the grid cell
+    vx : float 2D array
+        x-component of the channel direction field
+    vy : float 2D array
+        y-component of the channel direction field
+    distxy : float 2D array
+        weighting field controlling the channel influence
+    iy : integer
+        y-index of the lower-left cell containing the lobe center
+    iy1 : integer
+        y-index of the upper-left cell containing the lobe center
+    ix : integer
+        x-index of the lower-left cell containing the lobe center
+    ix1 : integer
+        x-index of the lower-right cell containing the lobe center
+    alfa_channel : float
+        parameter controlling the strength of the channel correction
+
+    Returns
+    -------
+    new_angle : float
+        angle of the lobe after channel correction
+    """
 
     # interpolate the vector at the corners of the pixel to find the
     # vector at the center of the lobe
@@ -491,6 +503,19 @@ def channel_mod_angle(old_angle):
 
 # @njit(fastmath=True, nogil=True, cache=True)
 def calculate_depth(tree):
+    """Compute the depth of each node in a tree
+
+    Parameters
+    ----------
+    tree : dictionary
+        dictionary with node-parent pairs defining the tree structure
+
+    Returns
+    -------
+    depth : dictionary
+        dictionary containing the depth of each node
+    """
+
     depth = {}
 
     def get_depth(node):
@@ -508,6 +533,18 @@ def calculate_depth(tree):
 
 
 def count_descendants(tree):
+    """Count the descendants of each lobe
+
+    Parameters
+    ----------
+    tree : dictionary
+        dictionary with node-parent pairs defining the tree structure
+
+    Returns
+    -------
+    descendant_counts : dictionary
+        dictionary containing the number of descendants of each node
+    """
     # Step 1: Build the tree from the parent-child dictionary
     children = defaultdict(list)
     for node, parent in tree.items():
@@ -550,7 +587,7 @@ def rasterize(x_i, y_i, x1_i, x2_i, angle_i, X_circle, Y_circle, xcmin, ycmin,
     Y_circle : float array
         array of y-coordinates of points on the unit circle
     xcmin : float
-        x-cooredinate of the center of the lower-left grid cell
+        x-coordinate of the center of the lower-left grid cell
     ycmin : float
         y-cooredinate of the center of the lower-left grid cell
     cell : float
@@ -629,11 +666,11 @@ def bounding_box(xe, ye, xcmin, ycmin, cell, nx, ny):
     Parameters
     ----------
     xe : float array
-        x-cooredinates of the points on the ellipse
+        x-coordinates of the points on the ellipse
     ye : float array
         y-cooredinates of the points on the ellipse
     xcmin : float
-        x-cooredinate of the center of the lower-left grid cell
+        x-coordinate of the center of the lower-left grid cell
     ycmin : float
         y-cooredinate of the center of the lower-left grid cell
     cell : float
@@ -899,7 +936,7 @@ def step4and5(deg2rad, new_angle, angle_idx, x1_idx, x2_idx, x_idx, y_idx,
 
 
 # @njit(fastmath=True)
-def step3(angle_idx, deg2rad, old_angle, inertial_exponent):
+def step3(angle_idx, deg2rad, old_angle, inertial_exponent, slope):
     """ add inertial effect to lobe direction
     ----------
     angle_idx : float
@@ -910,7 +947,8 @@ def step3(angle_idx, deg2rad, old_angle, inertial_exponent):
         angle for lobe direction before inertia
     inertial_exponent : float
         parameter for the effect of inertia
-
+    slope : float
+        topography slope
 
     Returns
     -------
@@ -938,7 +976,7 @@ def step3(angle_idx, deg2rad, old_angle, inertial_exponent):
     else:
 
         alfa_inertial = (1.0 - (2.0 * np.arctan(slope) / np.pi) **
-                         inertial_exponent)**(1.0 / inertial_exponent)
+                         inertial_exponent) ** (1.0 / inertial_exponent)
 
     x_avg = (1.0 - alfa_inertial) * \
         cos_angle2 + alfa_inertial * cos_angle1
@@ -1012,9 +1050,9 @@ def step1A(x_i, y_i, xcmin, ycmin, cell, Ztot):
     Parameters
     ----------
     x_i : float
-        x-cooredinate of the lobe center
+        x-coordinate of the lobe center
     y_i : float
-        y-cooredinate of the lobe center
+        y-coordinate of the lobe center
     xcmin : float
         x-coordinate of the lower-left cell center of the grid domain
     ycmin : float
@@ -1077,17 +1115,17 @@ def step1(xi, ix, yi, iy, x_idx, y_idx, xcmin, ycmin, cell, Ztot, ax1, ax2,
     Parameters
     ----------
     xi : float
-        x-cooredinate of the lobe center
+        x-coordinate of the lobe center
     ix : integer
         x-index of the cell of the grid containing the lobe center
     yi : float
-        y-cooredinate of the lobe center
+        y-coordinate of the lobe center
     iy : integer
         y-index of the cell of the grid containing the lobe center
     x_idx : float
-        x-cooredinate of the parent lobe center
+        x-coordinate of the parent lobe center
     y_idx : float
-        y-cooredinate of the parent lobe center
+        y-coordinate of the parent lobe center
     xcmin : float
         x-coordinate of the lower-left cell center of the grid domain
     ycmin : float
@@ -1201,6 +1239,28 @@ def step1(xi, ix, yi, iy, x_idx, y_idx, xcmin, ycmin, cell, Ztot, ax1, ax2,
 
 @njit(fastmath=True)
 def step0(lobe_exponent, i, force_max_length, distInt, start_from_dist_flag):
+    """Select the parent lobe for the new lobe
+
+    Parameters
+    ----------
+    lobe_exponent : float
+        exponent controlling the probability of selecting recent lobes
+    i : integer
+        index of the new lobe
+    force_max_length : logical
+        logical flag to restrict the parent selection to lobes within
+        the maximum allowed distance
+    distInt : integer array
+        distance of previous lobes from the first lobe of the chain
+    start_from_dist_flag : logical
+        logical flag to associate the probability law to the distance
+        from the vent
+
+    Returns
+    -------
+    idx : integer
+        index of the selected parent lobe
+    """
 
     idx0 = np.random.uniform(0, 1, size=1)[0]
 
@@ -1306,6 +1366,32 @@ def interp2Dgrids(xin, yin, Zin, Xout, Yout):
 
 @njit(fastmath=True, nogil=True, cache=True)
 def ellipse(xc, yc, ax1, ax2, angle, X_circle, Y_circle):
+    """Compute the coordinates of points on an ellipse
+
+    Parameters
+    ----------
+    xc : float
+        x-coordinate of ellipse center
+    yc : float
+        y-coordinate of ellipse center
+    ax1 : float
+        first semiaxis of the ellipse
+    ax2 : float
+        second semiaxis of the ellipse
+    angle : float
+        orientation angle of the ellipse
+    X_circle : float array
+        x-coordinates of points on the unit circle
+    Y_circle : float array
+        y-coordinates of points on the unit circle
+
+    Returns
+    -------
+    xe : float array
+        x-coordinates of points on the ellipse
+    ye : float array
+        y-coordinates of points on the ellipse
+    """
 
     cos_angle = np.cos(angle * np.pi / 180)
     sin_angle = np.sin(angle * np.pi / 180)
@@ -1332,9 +1418,9 @@ def local_intersection(Xc_local, Yc_local, xc_e, yc_e, ax1, ax2, angle, xv, yv,
     Parameters
     ----------
     Xc_local : float 2D array
-        x-cooredinates of the centers of the local grid cells
+        x-coordinates of the centers of the local grid cells
     Yc_local : float 2D array
-        y-cooredinates of the centers of the local grid cells
+        y-coordinates of the centers of the local grid cells
     xc_e : float
         x-coordinate of ellipse center
     yc_e : float
@@ -1409,7 +1495,8 @@ def init_sources():
 
     if vent_flag in (2, 3, 6):
         if n_vents < 2:
-            raise ValueError(f"vent_flag = {vent_flag} requires at least 2 vent points")
+            raise ValueError(
+                f"vent_flag = {vent_flag} requires at least 2 vent points")
         n_sources = n_vents - 1
     else:
         n_sources = n_vents
@@ -1437,7 +1524,8 @@ def init_sources():
     elif vent_flag in (4, 5, 7):
         if len(x_vent_end) != n_vents or len(y_vent_end) != n_vents:
             raise ValueError(
-                f"vent_flag = {vent_flag} requires x_vent_end/y_vent_end with length n_vents"
+                f"vent_flag = {vent_flag} requires x_vent_end/y_vent_end "
+                "with length n_vents"
             )
         x_source[:] = x_vent[:n_sources]
         y_source[:] = y_vent[:n_sources]
@@ -1445,11 +1533,15 @@ def init_sources():
         y_source_end[:] = y_vent_end[:n_sources]
 
     else:
-        raise ValueError(f"Unsupported vent_flag in Python source logic: {vent_flag}")
+        raise ValueError(
+            f"Unsupported vent_flag in Python source logic: {vent_flag}")
 
 
 def build_source_cdf():
-    """Build the cumulative source probabilities used by weighted source modes."""
+    """
+    Build the cumulative source probabilities used
+    by weighted source modes.
+    """
     global cum_source_prob
 
     cum_source_prob = np.zeros(n_sources, dtype=float)
@@ -1459,20 +1551,29 @@ def build_source_cdf():
         return
 
     if vent_flag in (2, 4):
-        source_length = np.hypot(x_source_end - x_source, y_source_end - y_source)
+        source_length = np.hypot(x_source_end - x_source,
+                                 y_source_end - y_source)
         if np.sum(source_length) <= 0.0:
-            raise ValueError("source lengths must define a positive total selection weight")
+            raise ValueError(
+                "source lengths must define a positive total selection weight")
         cum_source_prob[:] = np.cumsum(source_length)
         cum_source_prob[:] = cum_source_prob[:] / cum_source_prob[-1]
 
     elif vent_flag in (3, 5):
-        cum_source_prob[:] = (np.arange(n_sources, dtype=float) + 1.0) / float(n_sources)
+        cum_source_prob[:] = (np.arange(n_sources, dtype=float) +
+                              1.0) / float(n_sources)
 
     elif vent_flag in (6, 7, 8):
         if source_probabilities is None:
-            raise ValueError("source_probabilities must be provided for vent_flag 6, 7 or 8")
+            raise ValueError(
+                "source_probabilities must be provided for "
+                "vent_flag 6, 7 or 8"
+            )
         if len(source_probabilities) < n_sources:
-            raise ValueError("source_probabilities must be dimensioned on the discrete sources")
+            raise ValueError(
+                "source_probabilities must be dimensioned "
+                "on the discrete sources"
+            )
         prob = np.asarray(source_probabilities[:n_sources], dtype=float)
         if np.any(prob < 0.0):
             raise ValueError("source_probabilities must be non-negative")
@@ -1488,7 +1589,10 @@ def build_source_cdf():
 
 
 def prepare_source_activation_arrays(total_volume):
-    """Resize and validate source activation windows on the discrete sources."""
+    """
+    Resize and validate source activation windows
+    on the discrete sources.
+    """
     global source_volume_from, source_volume_to
 
     default_to = 1.01 * total_volume
@@ -1501,7 +1605,8 @@ def prepare_source_activation_arrays(total_volume):
             source_volume_from = np.full(n_sources, float(source_volume_from))
         elif len(source_volume_from) < n_sources:
             raise ValueError(
-                "source_volume_from must have one value for each discrete source entity"
+                "source_volume_from must have one value "
+                "for each discrete source entity"
             )
         else:
             source_volume_from = source_volume_from[:n_sources].copy()
@@ -1514,28 +1619,36 @@ def prepare_source_activation_arrays(total_volume):
             source_volume_to = np.full(n_sources, float(source_volume_to))
         elif len(source_volume_to) < n_sources:
             raise ValueError(
-                "source_volume_to must have one value for each discrete source entity"
+                "source_volume_to must have one value "
+                "for each discrete source entity"
             )
         else:
             source_volume_to = source_volume_to[:n_sources].copy()
         source_volume_to[source_volume_to == -9999.0] = default_to
 
     if np.any(source_volume_from > source_volume_to):
-        raise ValueError("source_volume_from must be less than or equal to source_volume_to")
+        raise ValueError(
+            "source_volume_from must be less than or equal to source_volume_to"
+        )
 
     if np.any(source_volume_from < 0.0) or np.any(source_volume_to < 0.0):
-        raise ValueError("source activation volume bounds must be non-negative")
+        raise ValueError(
+            "source activation volume bounds must be non-negative")
 
-    if np.any(source_volume_from > total_volume) or np.any(source_volume_to > default_to):
-        raise ValueError("source activation volume bounds must not exceed total_volume")
+    if np.any(source_volume_from > total_volume) or np.any(
+            source_volume_to > default_to):
+        raise ValueError(
+            "source activation volume bounds must not exceed total_volume")
 
 
 def _sample_point_on_source(i_source):
     """Sample a point source or a random point along a line source."""
     if vent_flag in (2, 3, 4, 5, 6, 7):
         alfa_source = np.random.random()
-        x_i = x_source[i_source] + alfa_source * (x_source_end[i_source] - x_source[i_source])
-        y_i = y_source[i_source] + alfa_source * (y_source_end[i_source] - y_source[i_source])
+        x_i = x_source[i_source] + alfa_source * \
+            (x_source_end[i_source] - x_source[i_source])
+        y_i = y_source[i_source] + alfa_source * \
+            (y_source_end[i_source] - y_source[i_source])
     else:
         x_i = x_source[i_source]
         y_i = y_source[i_source]
@@ -1544,18 +1657,23 @@ def _sample_point_on_source(i_source):
 
 
 def first_lobe(flow, Zflow):
-    """Compute the coordinate of the first lobe using the source-based logic."""
+    """Compute the coordinate of the first lobe
+    using the source-based logic."""
     Vcum = cell * cell * np.sum(Zflow)
     source_is_active = (source_volume_from <= Vcum) & (Vcum < source_volume_to)
 
     if not np.any(source_is_active):
         raise ValueError(
-            f"no active source found for current cumulative erupted volume; Vcum = {Vcum}"
+            f"no active source found for current cumulative "
+            f"erupted volume; Vcum = {Vcum}"
         )
 
     if n_sources == 1:
         if not source_is_active[0]:
-            raise ValueError(f"single source is inactive for current cumulative erupted volume; Vcum = {Vcum}")
+            raise ValueError(
+                f"single source is inactive for current cumulative "
+                f"erupted volume; Vcum = {Vcum}"
+            )
         return _sample_point_on_source(0)
 
     active_source_weight = np.zeros(n_sources, dtype=float)
@@ -1569,10 +1687,12 @@ def first_lobe(flow, Zflow):
         active_source_weight[~source_is_active] = 0.0
 
     elif vent_flag in (6, 7, 8):
-        active_source_weight[source_is_active] = source_probabilities[source_is_active]
+        active_source_weight[source_is_active] = source_probabilities[
+            source_is_active]
 
     if np.sum(active_source_weight) <= 0.0:
-        raise ValueError(f"active sources have zero total selection weight; Vcum = {Vcum}")
+        raise ValueError(
+            f"active sources have zero total selection weight; Vcum = {Vcum}")
 
     if vent_flag == 0:
         active_idx = np.where(source_is_active)[0]
@@ -1581,7 +1701,10 @@ def first_lobe(flow, Zflow):
         return _sample_point_on_source(active_idx[i_source])
 
     alfa_source = np.random.random() * np.sum(active_source_weight)
-    i_source = int(np.searchsorted(np.cumsum(active_source_weight), alfa_source, side='left'))
+    i_source = int(
+        np.searchsorted(np.cumsum(active_source_weight),
+                        alfa_source,
+                        side='left'))
     i_source = min(i_source, n_sources - 1)
     return _sample_point_on_source(i_source)
 
@@ -1596,67 +1719,34 @@ print("")
 
 n_vents = len(x_vent)
 
-try:
-
-    from input_data import x_vent_end
-
-except ImportError:
-
-    print('x_vent_end not used')
-    x_vent_end = []
-
-try:
-
-    from input_data import y_vent_end
-
-except ImportError:
-
-    print('y_vent_end not used')
-    y_vent_end = []
+x_vent_end = getattr(input_data, "x_vent_end", [])
+y_vent_end = getattr(input_data, "y_vent_end", [])
 
 x_vent = np.asarray(x_vent, dtype=float)
 y_vent = np.asarray(y_vent, dtype=float)
 x_vent_end = np.asarray(x_vent_end, dtype=float)
 y_vent_end = np.asarray(y_vent_end, dtype=float)
 
-try:
-
-    from input_data import source_probabilities
-
-except ImportError:
-
-    print('source_probabilities not used')
-    source_probabilities = None
-
-try:
-
-    from input_data import source_volume_from
-
-except ImportError:
-
-    print('source_volume_from not used')
-    source_volume_from = None
-
-try:
-
-    from input_data import source_volume_to
-
-except ImportError:
-
-    print('source_volume_to not used')
-    source_volume_to = None
+source_probabilities = getattr(input_data, "source_probabilities", None)
+source_volume_from = getattr(input_data, "source_volume_from", None)
+source_volume_to = getattr(input_data, "source_volume_to", None)
 
 if source_probabilities is not None:
     source_probabilities = np.asarray(source_probabilities, dtype=float)
 
+channel_file = getattr(input_data, "channel_file", None)
 
-if force_max_length:
-
-    from input_data_advanced import max_length
-
+if channel_file is None:
+    check_channel_file = False
 else:
+    check_channel_file = exists(channel_file)
 
-    max_length = 0
+alfa_channel = getattr(input_data, "alfa_channel", 0.0)
+d1 = getattr(input_data, "d1", None)
+d2 = getattr(input_data, "d2", None)
+eps = getattr(input_data, "eps", None)
+
+max_length = getattr(input_data_advanced, "max_length", 0)
 
 # search if another run with the same base name already exists
 i = 0
@@ -1712,23 +1802,8 @@ h = np.zeros(alloc_n_lobes)
 dist_int = np.zeros(alloc_n_lobes, dtype=int) - 1
 parent = np.zeros(alloc_n_lobes, dtype=int)
 
-try:
-
-    from input_data import volume_flag
-
-except ImportError:
-
-    print('volume_flag non specified in input')
-    sys.exit()
-
-try:
-
-    from input_data import total_volume
-
-except ImportError:
-
-    print('total_volume needed for source activation windows and volume checks')
-    sys.exit()
+volume_flag = getattr(input_data, "volume_flag", None)
+total_volume = getattr(input_data, "total_volume", None)
 
 if (volume_flag == 1):
 
@@ -1767,39 +1842,14 @@ Xc, Yc, Ztopo, xcmin, xcmax, ycmin, ycmax, cell, nx, ny, nd, lx, ly, \
 
 filling_parameter = (1.0 - thickening_parameter) * np.ones_like(Ztopo)
 
-try:
-
-    from input_data import channel_file
-    check_channel_file = exists(channel_file)
-
-except ImportError:
-
-    print('Channel parameters not defined:')
-    print('- channel_file')
-    print('- d1')
-    print('- d2')
-    print('- eps')
-    print('- alfa_chaneel')
-
-    check_channel_file = False
-    alfa_channel = 0.0
-
 if check_channel_file:
 
-    distxy = initialize_channel(Xc, Yc)
+    distxy, vx, vy = initialize_channel(Xc, Yc)
 
-try:
-
-    from input_data_advanced import restart_files
-    from input_data_advanced import restart_filling_parameters
-    print('Restart files', restart_files)
-    n_restarts = len(restart_files)
-
-except ImportError:
-
-    print('')
-    print('Restart_files not used')
-    n_restarts = 0
+restart_files = getattr(input_data_advanced, "restart_files", [])
+restart_filling_parameters = getattr(input_data_advanced,
+                                     "restart_filling_parameters", [])
+n_restarts = len(restart_files)
 
 # load restart files (if existing)
 for i_restart in range(0, n_restarts):
@@ -2082,11 +2132,17 @@ for flow in range(0, n_flows):
         old_angle = step2(max_slope_prob, slope, max_slope_angle)
 
         cos_angle1, sin_angle1, new_angle = step3(angle[idx], deg2rad,
-                                                  old_angle, inertial_exponent)
+                                                  old_angle, inertial_exponent,
+                                                  slope)
 
         if (alfa_channel > 0.0):
 
-            new_angle = channel_mod_angle(new_angle)
+            xi_fract = xi - ix
+            yi_fract = yi - iy
+
+            new_angle = channel_mod_angle(old_angle, xi_fract, yi_fract,
+                                          vx, vy, distxy,
+                                          iy, iy1, ix, ix1, alfa_channel)
 
         out_step4 = step4and5(deg2rad, new_angle, angle[idx], x1[idx], x2[idx],
                               x[idx], y[idx], zidx, max_cells, lobe_area,
@@ -2376,8 +2432,7 @@ try:
         ud_file.write(
             'Masking,Union Area, Intersection Area, Fitting Parameter, ' +
             'Vol1 in intersection, Vol2 in intersection, ' +
-            'Thickness relative error'
-            + '\n')
+            'Thickness relative error' + '\n')
         ud_file.write(str(1.0) + ' , ')
         ud_file.write(str(area_union) + ' , ' + str(area_inters) + ' , ')
         ud_file.write(str(fitting_parameter) + ' , ')
