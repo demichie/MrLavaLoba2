@@ -282,10 +282,9 @@ def initialize_channel(Xc, Yc):
     print('Reading shapefile ' + channel_file)
 
     sf = shapefile.Reader(channel_file)
-
-    # shapes = sf.shapes()
     shapeRecs = sf.shapeRecords()
-    points = shapeRecs[0].shape.points[0:]
+    points = shapeRecs[0].shape.points[:]    
+
     ln = LineString(points)
 
     pnew_x = points[-1][0] + 200.0 * (points[-1][0] - points[-2][0])
