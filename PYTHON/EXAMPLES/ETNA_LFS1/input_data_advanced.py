@@ -2,7 +2,8 @@
 # you want to start a simulation considering the existence of previous
 # flows. Leave the field empy [] if you don't want to use it.
 # If you want to use more than one file separate them with a comma.
-# Example: restart_file = ['flow_001_thickness_full.asc','flow_002_thickness_full.asc]
+# Example: restart_file = ['flow_001_thickness_full.asc',
+#                          'flow_002_thickness_full.asc]
 restart_files = []
 
 # If saveshape_flag = 1 then the output with the lobes is saved on a shapefile
@@ -24,9 +25,11 @@ plot_flow_flag = 0
 
 # The number of lobes of the flow is defined accordingly to a random uniform
 # distribution or to a beta law, as a function of the flow number.
-# a_beta, b_beta = 0  => n_lobes is sampled randomly in [min_n_lobes,max_n_lobes]
-# a_beta, b_beta > 0  => n_lobes = min_n_lobes + 0.5 * ( max_n_lobes - min_n_lobes )
-#                                              * beta(flow/n_flows,a_beta,b_beta)
+# a_beta, b_beta = 0  => n_lobes is sampled randomly
+#                        in [min_n_lobes,max_n_lobes]
+# a_beta, b_beta > 0  => n_lobes = min_n_lobes
+#                                 + 0.5 * ( max_n_lobes - min_n_lobes )
+#                                 * beta(flow/n_flows,a_beta,b_beta)
 a_beta = 0.0
 b_beta = 0.0
 
@@ -49,14 +52,14 @@ n_check_loop = 0
 
 # This flag controls which lobes have larger probability:
 # start_from_dist_flag = 1  => the lobes with a larger distance from
-#			       the vent have a higher probability
+#                              the vent have a higher probability
 # start_form_dist_flag = 0  => the younger lobes have a higher
 # 			       probability
 start_from_dist_flag = 0
 
 # This factor is to choose where the center of the new lobe will be:
 # dist_fact = 0  => the center of the new lobe is on the border of the
-# 	 	    previous one;
+#                   previous one;
 # dist fact > 0  => increase the distance of the center of the new lobe
 # 		    from the border of the previous one;
 # dist_fact = 1  => the two lobes touch in one point only.
@@ -69,13 +72,11 @@ npoints = 30
 # the larger is the effect of a small slope on the eccentricity of the lobes:
 # aspect_ratio_coeff = 0  => the lobe is always a circle
 # aspect_ratio_coeff > 0  => the lobe is an ellipse, with the aspect ratio
-#			     increasing with the slope 
+#                            increasing with the slope
 aspect_ratio_coeff = 20.0
 
-# Maximum aspect ration of the lobes 
+# Maximum aspect ration of the lobes
 max_aspect_ratio = 5
 
 # Shapefile name (use '' if no shapefile is present)
 shape_name = ''
-
-
