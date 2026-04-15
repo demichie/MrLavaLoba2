@@ -24,7 +24,7 @@ keywords:
   - stochastic model
   - DEM
 version: "1.0.0"
-date-released: "2026/04/15"
+date-released: "2026-04-15"
 doi: "10.5281/zenodo.REPLACE_WITH_ZENODO_DOI"
 preferred-citation:
   type: software
