@@ -1,5 +1,12 @@
 # Mr Lava Loba
 
+[![SQAaaS badge](https://github.com/EOSC-synergy/SQAaaS/raw/master/badges/badges_150x116/badge_software_silver.png)](https://api.eu.badgr.io/public/assertions/dALSHbmqSRehjxju4fahvA "SQAaaS silver badge achieved")
+
+[![SQAaaS badge shields.io](https://img.shields.io/badge/sqaaas%20software-silver-lightgrey)](https://api.eu.badgr.io/public/assertions/dALSHbmqSRehjxju4fahvA "SQAaaS silver badge achieved")
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19597592.svg)](https://doi.org/10.5281/zenodo.19597592)
+
+
 Mr Lava Loba is a stochastic lava-flow simulation code available in two implementations:
 
 - **Fortran** (`F90/`)
