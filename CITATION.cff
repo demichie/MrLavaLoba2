@@ -23,8 +23,8 @@ keywords:
   - hazard assessment
   - stochastic model
   - DEM
-version: "REPLACE_WITH_RELEASE_VERSION"
-date-released: "REPLACE_WITH_RELEASE_DATE"
+version: "1.0.0"
+date-released: "2026/04/15"
 doi: "10.5281/zenodo.REPLACE_WITH_ZENODO_DOI"
 preferred-citation:
   type: software
