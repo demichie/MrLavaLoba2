@@ -15,1655 +15,1837 @@
 !********************************************************************************
 
 MODULE inpout
+  
+  USE parameters
+  
+  IMPLICIT NONE
 
-   USE parameters
+  !> Flag for the output in NetCDF format
+  !> - T      => netCDF4 file saved (.nc)
+  !> - F      => not saved
+  !> .
+  LOGICAL :: nc_flag
 
-   IMPLICIT NONE
+  !> Flag for the output in ESRI raster format
+  !> - T      => ascii file saved (.asc)
+  !> - F      => not saved
+  !> .
+  LOGICAL :: asc_flag
 
-   !> Flag for the output in NetCDF format
-   !> - T      => netCDF4 file saved (.nc)
-   !> - F      => not saved
-   !> .
-   LOGICAL :: nc_flag
+  CHARACTER(LEN=50) :: input_file         !< File with the run parameters
+  CHARACTER(LEN=50) :: backup_file        !< Bakcup File with the run parameters
+  CHARACTER(LEN=50) :: union_diff_file    !< File with previous output to compare
+  CHARACTER(LEN=50) :: ud_output_file     !< File with output of comparison
+  INTEGER, PARAMETER :: input_unit = 7       !< Input data unit
+  INTEGER, PARAMETER :: topo_unit = 8        !< Topography DEM unit
+  INTEGER, PARAMETER :: backup_unit = 9      !> Input Backup data unit
+  INTEGER, PARAMETER :: restart_unit = 10
+  INTEGER, PARAMETER :: output_unit = 11
+  INTEGER, PARAMETER :: asc_unit = 12
+  INTEGER, PARAMETER :: ud_output_unit = 13
 
-   !> Flag for the output in ESRI raster format
-   !> - T      => ascii file saved (.asc)
-   !> - F      => not saved
-   !> .
-   LOGICAL :: asc_flag
+  INTEGER :: cols, rows
 
-   CHARACTER(LEN=50) :: input_file         !< File with the run parameters
-   CHARACTER(LEN=50) :: backup_file        !< Bakcup File with the run parameters
-   CHARACTER(LEN=50) :: union_diff_file    !< File with previous output to compare
-   CHARACTER(LEN=50) :: ud_output_file     !< File with output of comparison
-   INTEGER, PARAMETER :: input_unit = 7       !< Input data unit
-   INTEGER, PARAMETER :: topo_unit = 8        !< Topography DEM unit
-   INTEGER, PARAMETER :: backup_unit = 9      !> Input Backup data unit
-   INTEGER, PARAMETER :: restart_unit = 10
-   INTEGER, PARAMETER :: output_unit = 11
-   INTEGER, PARAMETER :: asc_unit = 12
-   INTEGER, PARAMETER :: ud_output_unit = 13
+  INTEGER :: utm_zone
+  LOGICAL :: north_hemisphere
 
-   INTEGER :: cols, rows
 
-   NAMELIST / run_parameters / run_name, source, vent_flag, crop_flag,         &
-      hazard_flag, volume_flag, fixed_dimension_flag, topo_mod_flag,           &
-      restart_flag, nc_flag , asc_flag, union_diff_flag
+  NAMELIST / run_parameters / run_name, source, vent_flag, crop_flag,         &
+       hazard_flag, volume_flag, fixed_dimension_flag, topo_mod_flag,         &
+       restart_flag, nc_flag , utm_zone_str, asc_flag, union_diff_flag
 
-   NAMELIST / vent_parameters / n_vents, x_vent, y_vent , x_vent_end ,         &
-      y_vent_end , source_probabilities , source_volume_from , source_volume_to
+  NAMELIST / vent_parameters / n_vents, x_vent, y_vent , x_vent_end ,         &
+       y_vent_end , source_probabilities , source_volume_from , source_volume_to
 
-   NAMELIST / crop_parameters / east_to_vent, west_to_vent, south_to_vent,     &
-      north_to_vent
+  NAMELIST / crop_parameters / east_to_vent, west_to_vent, south_to_vent,     &
+       north_to_vent
 
-   NAMELIST / flow_parameters / n_flows, min_n_lobes, max_n_lobes,             &
-      total_volume, lobe_area, avg_lobe_thickness, thickness_ratio ,           &
-      thickening_parameter, lobe_exponent, max_slope_prob, inertial_exponent , &
-      n_init , dist_fact, aspect_ratio_coeff, max_aspect_ratio, a_beta, b_beta
+  NAMELIST / flow_parameters / n_flows, min_n_lobes, max_n_lobes,              &
+       total_volume, lobe_area, avg_lobe_thickness, thickness_ratio ,           &
+       thickening_parameter, lobe_exponent, max_slope_prob, inertial_exponent , &
+       n_init , dist_fact, aspect_ratio_coeff, max_aspect_ratio, a_beta, b_beta
 
-   NAMELIST / restart_parameters / n_restarts, restart_files,                  &
-      restart_filling_parameters
+  NAMELIST / restart_parameters / n_restarts, restart_files,                  &
+       restart_filling_parameters
 
-   NAMELIST / numerical_parameters / npoints, nv
+  NAMELIST / numerical_parameters / npoints, nv
 
-   NAMELIST / union_diff_parameters / union_diff_file
+  NAMELIST / union_diff_parameters / union_diff_file
 
 CONTAINS
 
-   !***********************************************************************
-   !> @brief Initialize input parameters with default values.
-   !!
-   !! Sets the default values of the main input parameters used by the
-   !! model before reading the user input file.
-   !!
-   !! The subroutine initializes logical flags, scalar parameters, and
-   !! allocatable arrays related to vent geometry, source probabilities,
-   !! source activation windows, restart files, and flow controls. Sentinel
-   !! values are assigned to parameters that must later be overwritten by
-   !! the input file, while meaningful defaults are assigned where
-   !! appropriate.
-   !!
-   !! In particular, source activation windows are initialized so that
-   !! `source_volume_from` is zero for all sources, while
-   !! `source_volume_to` is set to a placeholder value to be replaced later
-   !! after reading `total_volume`.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !!
-   !! @note This subroutine has no explicit input or output arguments.
-   !! It operates on module variables imported from `parameters`.
-   !***********************************************************************
-   SUBROUTINE init_param
+  !***********************************************************************
+  !> @brief Initialize input parameters with default values.
+  !!
+  !! Sets the default values of the main input parameters used by the
+  !! model before reading the user input file.
+  !!
+  !! The subroutine initializes logical flags, scalar parameters, and
+  !! allocatable arrays related to vent geometry, source probabilities,
+  !! source activation windows, restart files, and flow controls. Sentinel
+  !! values are assigned to parameters that must later be overwritten by
+  !! the input file, while meaningful defaults are assigned where
+  !! appropriate.
+  !!
+  !! In particular, source activation windows are initialized so that
+  !! `source_volume_from` is zero for all sources, while
+  !! `source_volume_to` is set to a placeholder value to be replaced later
+  !! after reading `total_volume`.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !!
+  !! @note This subroutine has no explicit input or output arguments.
+  !! It operates on module variables imported from `parameters`.
+  !***********************************************************************
+  SUBROUTINE init_param
 
-      IMPLICIT none
+    IMPLICIT none
 
-      nc_flag = .FALSE.
-      asc_flag = .TRUE.
+    nc_flag = .FALSE.
+    utm_zone_str = "NODEF"
 
-      vent_flag = -1
+    asc_flag = .TRUE.
 
-      union_diff_flag = .FALSE.
+    vent_flag = -1
 
-      n_vents = -9999
+    union_diff_flag = .FALSE.
 
-      ALLOCATE(x_vent(20))
-      ALLOCATE(y_vent(20))
-      x_vent(:) = -9999.0_wp
-      y_vent(:) = -9999.0_wp
+    n_vents = -9999
 
-      ALLOCATE(x_vent_end(20))
-      ALLOCATE(y_vent_end(20))
-      x_vent_end(:) = -9999.0_wp
-      y_vent_end(:) = -9999.0_wp
+    ALLOCATE(x_vent(20))
+    ALLOCATE(y_vent(20))
+    x_vent(:) = -9999.0_wp
+    y_vent(:) = -9999.0_wp
 
-      ALLOCATE(source_probabilities(20))
-      source_probabilities(:) = -9999.0_wp
+    ALLOCATE(x_vent_end(20))
+    ALLOCATE(y_vent_end(20))
+    x_vent_end(:) = -9999.0_wp
+    y_vent_end(:) = -9999.0_wp
 
-      ALLOCATE(source_volume_from(20))
-      ALLOCATE(source_volume_to(20))
+    ALLOCATE(source_probabilities(20))
+    source_probabilities(:) = -9999.0_wp
 
-      ! Default lower bound: source active from the beginning
-      source_volume_from(:) = 0.0_wp
+    ALLOCATE(source_volume_from(20))
+    ALLOCATE(source_volume_to(20))
 
-      ! Placeholder upper bound: if not provided, it will later be replaced
-      ! with total_volume after reading the input file
-      source_volume_to(:) = -9999.0_wp
+    ! Default lower bound: source active from the beginning
+    source_volume_from(:) = 0.0_wp
 
-      east_to_vent = -9999.0_wp
-      west_to_vent = -9999.0_wp
-      south_to_vent = -9999.0_wp
-      north_to_vent = -9999.0_wp
+    ! Placeholder upper bound: if not provided, it will later be replaced
+    ! with total_volume after reading the input file
+    source_volume_to(:) = -9999.0_wp
 
-      n_flows = -9999
-      min_n_lobes = -9999
-      max_n_lobes = -9999
-      total_volume = -9999.0_wp
-      lobe_area = -9999.0_wp
-      avg_lobe_thickness = -9999.0_wp
-      thickness_ratio = -9999.0_wp
-      thickening_parameter = -9999.0_wp
-      lobe_exponent = -9999.0_wp
-      max_slope_prob = -9999.0_wp
-      inertial_exponent = -9999.0_wp
-      n_init = -9999
-      dist_fact = -9999.0_wp
-      aspect_ratio_coeff = -9999.0_wp
-      max_aspect_ratio = -9999.0_wp
-      npoints = -9999
+    east_to_vent = -9999.0_wp
+    west_to_vent = -9999.0_wp
+    south_to_vent = -9999.0_wp
+    north_to_vent = -9999.0_wp
 
-      a_beta = -9999.0_wp
-      b_beta = -9999.0_wp
+    n_flows = -9999
+    min_n_lobes = -9999
+    max_n_lobes = -9999
+    total_volume = -9999.0_wp
+    lobe_area = -9999.0_wp
+    avg_lobe_thickness = -9999.0_wp
+    thickness_ratio = -9999.0_wp
+    thickening_parameter = -9999.0_wp
+    lobe_exponent = -9999.0_wp
+    max_slope_prob = -9999.0_wp
+    inertial_exponent = -9999.0_wp
+    n_init = -9999
+    dist_fact = -9999.0_wp
+    aspect_ratio_coeff = -9999.0_wp
+    max_aspect_ratio = -9999.0_wp
+    npoints = -9999
 
-      n_restarts = -9999
-      ALLOCATE(restart_files(20))
-      ALLOCATE(restart_filling_parameters(20))
+    a_beta = -9999.0_wp
+    b_beta = -9999.0_wp
 
-      force_max_length = .FALSE.
-      start_from_dist_flag = .FALSE.
-      max_length = 50
+    n_restarts = -9999
+    ALLOCATE(restart_files(20))
+    ALLOCATE(restart_filling_parameters(20))
+
+    force_max_length = .FALSE.
+    start_from_dist_flag = .FALSE.
+    max_length = 50
 
 
-   END SUBROUTINE init_param
+  END SUBROUTINE init_param
 
-   !***********************************************************************
-   !> @brief Read and validate the model input parameters from file.
-   !!
-   !! Reads the input namelists from the main input file, assigns the user
-   !! values to the corresponding model variables, allocates temporary and
-   !! final arrays when needed, and performs consistency checks on the
-   !! provided parameters.
-   !!
-   !! The subroutine handles the full set of run, vent, topography, lobe,
-   !! flow, output, and restart parameters. It also processes optional
-   !! source-related arrays such as vent coordinates, fissure endpoints,
-   !! user-defined source probabilities, and source activation windows,
-   !! converting them into the internal parameter representation used by
-   !! the model.
-   !!
-   !! When required, default values are preserved for omitted optional
-   !! inputs. The subroutine stops with an error message if the input file
-   !! is missing, if a namelist cannot be read correctly, or if parameter
-   !! values are inconsistent with the expected model configuration.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !!
-   !! @note This subroutine has no explicit input or output arguments.
-   !! It operates on module variables imported from `parameters`.
-   !***********************************************************************
-   SUBROUTINE read_param
+  !***********************************************************************
+  !> @brief Read and validate the model input parameters from file.
+  !!
+  !! Reads the input namelists from the main input file, assigns the user
+  !! values to the corresponding model variables, allocates temporary and
+  !! final arrays when needed, and performs consistency checks on the
+  !! provided parameters.
+  !!
+  !! The subroutine handles the full set of run, vent, topography, lobe,
+  !! flow, output, and restart parameters. It also processes optional
+  !! source-related arrays such as vent coordinates, fissure endpoints,
+  !! user-defined source probabilities, and source activation windows,
+  !! converting them into the internal parameter representation used by
+  !! the model.
+  !!
+  !! When required, default values are preserved for omitted optional
+  !! inputs. The subroutine stops with an error message if the input file
+  !! is missing, if a namelist cannot be read correctly, or if parameter
+  !! values are inconsistent with the expected model configuration.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !!
+  !! @note This subroutine has no explicit input or output arguments.
+  !! It operates on module variables imported from `parameters`.
+  !***********************************************************************
+  SUBROUTINE read_param
 
-      IMPLICIT NONE
+    IMPLICIT NONE
 
-      INTEGER :: ios
-      LOGICAL :: lexist
-      LOGICAL :: condition
+    INTEGER :: ios
+    LOGICAL :: lexist
+    LOGICAL :: condition
 
-      CHARACTER(LEN=50) :: base_name
+    CHARACTER(LEN=50) :: base_name
 
-      REAL(wp), ALLOCATABLE :: x_vent_temp(:)
-      REAL(wp), ALLOCATABLE :: y_vent_temp(:)
+    REAL(wp), ALLOCATABLE :: x_vent_temp(:)
+    REAL(wp), ALLOCATABLE :: y_vent_temp(:)
 
-      REAL(wp), ALLOCATABLE :: x_vent_end_temp(:)
-      REAL(wp), ALLOCATABLE :: y_vent_end_temp(:)
+    REAL(wp), ALLOCATABLE :: x_vent_end_temp(:)
+    REAL(wp), ALLOCATABLE :: y_vent_end_temp(:)
 
-      REAL(wp), ALLOCATABLE :: source_probabilities_temp(:)
+    REAL(wp), ALLOCATABLE :: source_probabilities_temp(:)
 
-      REAL(wp), ALLOCATABLE :: source_volume_from_temp(:)
-      REAL(wp), ALLOCATABLE :: source_volume_to_temp(:)
+    REAL(wp), ALLOCATABLE :: source_volume_from_temp(:)
+    REAL(wp), ALLOCATABLE :: source_volume_to_temp(:)
 
-      CHARACTER(LEN = 50), ALLOCATABLE :: restart_files_temp(:)
-      REAL(wp), ALLOCATABLE :: restart_filling_parameters_temp(:)
+    CHARACTER(LEN = 50), ALLOCATABLE :: restart_files_temp(:)
+    REAL(wp), ALLOCATABLE :: restart_filling_parameters_temp(:)
 
-      INTEGER :: i    !< loop counter
+    INTEGER :: i    !< loop counter
 
-      LOGICAL :: tend1
-      CHARACTER(LEN=80) :: card
+    LOGICAL :: tend1
+    CHARACTER(LEN=80) :: card
 
-      INTEGER :: ud_file
+    INTEGER :: ud_file
 
-      input_file = 'mr_lava_loba.inp'
+    input_file = 'mr_lava_loba.inp'
 
-      INQUIRE (FILE=input_file,exist=lexist)
+    INQUIRE (FILE=input_file,exist=lexist)
 
-      IF (lexist .EQV. .FALSE.) THEN
+    IF (lexist .EQV. .FALSE.) THEN
 
-         WRITE(*,*) 'Input file IMEX_SfloW2D.inp not found'
-         STOP
+       WRITE(*,*) 'Input file IMEX_SfloW2D.inp not found'
+       STOP
 
-      END IF
+    END IF
 
-      OPEN(input_unit,FILE=input_file,STATUS='old')
+    OPEN(input_unit,FILE=input_file,STATUS='old')
 
-      ! ---------- READ run_parameters NAMELIST -----------------------------------
-      READ(input_unit, run_parameters,IOSTAT=ios )
+    ! ---------- READ run_parameters NAMELIST -----------------------------------
+    READ(input_unit, run_parameters,IOSTAT=ios )
 
-      IF ( ios .NE. 0 ) THEN
+    IF ( ios .NE. 0 ) THEN
 
-         WRITE(*,*) 'IOSTAT=',ios
-         WRITE(*,*) 'ERROR: problem with namelist RUN_PARAMETERS'
-         WRITE(*,*) 'Please check the input file'
-         WRITE(*,run_parameters)
-         STOP
+       WRITE(*,*) 'IOSTAT=',ios
+       WRITE(*,*) 'ERROR: problem with namelist RUN_PARAMETERS'
+       WRITE(*,*) 'Please check the input file'
+       WRITE(*,run_parameters)
+       STOP
 
-      ELSE
+    ELSE
 
-         WRITE(*,*) 'Run name: ',run_name
-         REWIND(input_unit)
+       WRITE(*,*) 'Run name: ',run_name
 
-      END IF
+       if (nc_flag) then
 
-      ! ---------- READ vent_parameters NAMELIST -----------------------------------
-      READ(input_unit, vent_parameters,IOSTAT=ios )
+          IF ( TRIM(utm_zone_str) == "NODEF" ) THEN
 
-      IF ( ios .NE. 0 ) THEN
+             WRITE(*,*) 'ERROR: problem with namelist RUN_PARAMETERS'
+             WRITE(*,*) 'Please define utm_zone_str'
+             WRITE(*,run_parameters)
+             STOP
 
-         WRITE(*,*) 'IOSTAT=',ios
-         WRITE(*,*) 'ERROR: problem with namelist VENT_PARAMETERS'
-         WRITE(*,*) 'Please check the input file'
-         WRITE(*,vent_parameters)
-         STOP
+          END IF
+          call parse_utm_zone(utm_zone_str, utm_zone, north_hemisphere)
+       end if
 
-      ELSE
+       REWIND(input_unit)
 
-         ALLOCATE(x_vent_temp(n_vents))
-         ALLOCATE(y_vent_temp(n_vents))
+    END IF
 
-         x_vent_temp(1:n_vents) = x_vent(1:n_vents)
-         y_vent_temp(1:n_vents) = y_vent(1:n_vents)
+    ! ---------- READ vent_parameters NAMELIST -----------------------------------
+    READ(input_unit, vent_parameters,IOSTAT=ios )
 
-         DEALLOCATE(x_vent)
-         DEALLOCATE(y_vent)
+    IF ( ios .NE. 0 ) THEN
 
-         ALLOCATE(x_vent(n_vents))
-         ALLOCATE(y_vent(n_vents))
+       WRITE(*,*) 'IOSTAT=',ios
+       WRITE(*,*) 'ERROR: problem with namelist VENT_PARAMETERS'
+       WRITE(*,*) 'Please check the input file'
+       WRITE(*,vent_parameters)
+       STOP
 
-         x_vent(:) = x_vent_temp(:)
-         y_vent(:) = y_vent_temp(:)
+    ELSE
 
-         DEALLOCATE(x_vent_temp)
-         DEALLOCATE(y_vent_temp)
+       ALLOCATE(x_vent_temp(n_vents))
+       ALLOCATE(y_vent_temp(n_vents))
 
-         WRITE(*,*) 'x_vent ',x_vent
-         WRITE(*,*) 'y_vent ',y_vent
+       x_vent_temp(1:n_vents) = x_vent(1:n_vents)
+       y_vent_temp(1:n_vents) = y_vent(1:n_vents)
 
-         !> Define the number of discrete sources associated with the
-         !> current vent geometry
-         SELECT CASE ( vent_flag )
+       DEALLOCATE(x_vent)
+       DEALLOCATE(y_vent)
 
-          CASE ( 2 , 3 )
+       ALLOCATE(x_vent(n_vents))
+       ALLOCATE(y_vent(n_vents))
 
-            IF ( n_vents < 2 ) THEN
+       x_vent(:) = x_vent_temp(:)
+       y_vent(:) = y_vent_temp(:)
 
-               WRITE(*,*) 'ERROR: vent_flag = ', vent_flag, &
+       DEALLOCATE(x_vent_temp)
+       DEALLOCATE(y_vent_temp)
+
+       WRITE(*,*) 'x_vent ',x_vent
+       WRITE(*,*) 'y_vent ',y_vent
+
+       !> Define the number of discrete sources associated with the
+       !> current vent geometry
+       SELECT CASE ( vent_flag )
+
+       CASE ( 2 , 3 )
+
+          IF ( n_vents < 2 ) THEN
+
+             WRITE(*,*) 'ERROR: vent_flag = ', vent_flag, &
                   ' requires at least 2 vent points'
 
-               STOP
+             STOP
 
-            END IF
+          END IF
 
-            n_sources = n_vents - 1
+          n_sources = n_vents - 1
 
-          CASE DEFAULT
+       CASE DEFAULT
 
-            n_sources = n_vents
+          n_sources = n_vents
 
-         END SELECT
+       END SELECT
 
-         IF ( n_sources < 1 ) THEN
-            WRITE(*,*) 'ERROR: the number of source entities must be at least 1'
-            STOP
-         END IF
+       IF ( n_sources < 1 ) THEN
+          WRITE(*,*) 'ERROR: the number of source entities must be at least 1'
+          STOP
+       END IF
 
-         IF ( vent_flag .GE. 6 ) THEN
+       IF ( vent_flag .GE. 6 ) THEN
 
-            IF ( ANY( source_probabilities(1:n_sources) == -9999.0_wp ) ) THEN
-               WRITE(*,*) 'ERROR: source_probabilities must be provided for all sources'
-               STOP
-            END IF
+          IF ( ANY( source_probabilities(1:n_sources) == -9999.0_wp ) ) THEN
+             WRITE(*,*) 'ERROR: source_probabilities must be provided for all sources'
+             STOP
+          END IF
 
-            IF ( SUM( source_probabilities(1:n_sources) ) <= 0.0_wp ) THEN
-               WRITE(*,*) 'ERROR: source_probabilities must have a positive sum'
-               STOP
-            END IF
+          IF ( SUM( source_probabilities(1:n_sources) ) <= 0.0_wp ) THEN
+             WRITE(*,*) 'ERROR: source_probabilities must have a positive sum'
+             STOP
+          END IF
 
-            IF ( ANY( source_probabilities(1:n_sources) < 0.0_wp ) ) THEN
-               WRITE(*,*) 'ERROR: source_probabilities must be non-negative'
-               STOP
-            END IF
+          IF ( ANY( source_probabilities(1:n_sources) < 0.0_wp ) ) THEN
+             WRITE(*,*) 'ERROR: source_probabilities must be non-negative'
+             STOP
+          END IF
 
-         END IF
+       END IF
 
-         IF ( ABS(x_vent_end(1) - (-9999.0_wp) )>= eps ) THEN
+       IF ( ABS(x_vent_end(1) - (-9999.0_wp) )>= eps ) THEN
 
-            ALLOCATE(x_vent_end_temp(n_vents))
-            ALLOCATE(y_vent_end_temp(n_vents))
+          ALLOCATE(x_vent_end_temp(n_vents))
+          ALLOCATE(y_vent_end_temp(n_vents))
 
-            x_vent_end_temp(1:n_vents) = x_vent_end(1:n_vents)
-            y_vent_end_temp(1:n_vents) = y_vent_end(1:n_vents)
+          x_vent_end_temp(1:n_vents) = x_vent_end(1:n_vents)
+          y_vent_end_temp(1:n_vents) = y_vent_end(1:n_vents)
 
-            DEALLOCATE(x_vent_end)
-            DEALLOCATE(y_vent_end)
+          DEALLOCATE(x_vent_end)
+          DEALLOCATE(y_vent_end)
 
-            ALLOCATE(x_vent_end(n_vents))
-            ALLOCATE(y_vent_end(n_vents))
+          ALLOCATE(x_vent_end(n_vents))
+          ALLOCATE(y_vent_end(n_vents))
 
-            x_vent_end(1:n_vents) = x_vent_end_temp(1:n_vents)
-            y_vent_end(1:n_vents) = y_vent_end_temp(1:n_vents)
+          x_vent_end(1:n_vents) = x_vent_end_temp(1:n_vents)
+          y_vent_end(1:n_vents) = y_vent_end_temp(1:n_vents)
 
-            DEALLOCATE(x_vent_end_temp)
-            DEALLOCATE(y_vent_end_temp)
+          DEALLOCATE(x_vent_end_temp)
+          DEALLOCATE(y_vent_end_temp)
 
-         END IF
+       END IF
 
-         IF ( ABS(source_probabilities(1) - (-9999.0_wp) )>= eps ) THEN
+       IF ( ABS(source_probabilities(1) - (-9999.0_wp) )>= eps ) THEN
 
-            IF ( vent_flag .LE. 5 ) THEN
+          IF ( vent_flag .LE. 5 ) THEN
 
-               WRITE(*,*)
-               WRITE(*,*) 'WARNING: source_probabilities'
-               WRITE(*,*) 'vent_flag =',vent_flag
-               WRITE(*,*) 'Values given in input file will no be used'
-               WRITE(*,*)
+             WRITE(*,*)
+             WRITE(*,*) 'WARNING: source_probabilities'
+             WRITE(*,*) 'vent_flag =',vent_flag
+             WRITE(*,*) 'Values given in input file will no be used'
+             WRITE(*,*)
 
-            END IF
+          END IF
 
-            ALLOCATE(source_probabilities_temp(n_sources))
+          ALLOCATE(source_probabilities_temp(n_sources))
 
-            source_probabilities_temp(1:n_sources) = source_probabilities(1:n_sources)
+          source_probabilities_temp(1:n_sources) = source_probabilities(1:n_sources)
 
-            DEALLOCATE(source_probabilities)
+          DEALLOCATE(source_probabilities)
 
-            ALLOCATE(source_probabilities(n_sources))
+          ALLOCATE(source_probabilities(n_sources))
 
-            source_probabilities(1:n_sources) = source_probabilities_temp(1:n_sources)
+          source_probabilities(1:n_sources) = source_probabilities_temp(1:n_sources)
 
-            DEALLOCATE(source_probabilities_temp)
+          DEALLOCATE(source_probabilities_temp)
 
-            ! Resize source activation volume arrays to the actual number of sources
-            ALLOCATE(source_volume_from_temp(n_sources))
-            ALLOCATE(source_volume_to_temp(n_sources))
+          ! Resize source activation volume arrays to the actual number of sources
+          ALLOCATE(source_volume_from_temp(n_sources))
+          ALLOCATE(source_volume_to_temp(n_sources))
 
-            source_volume_from_temp(1:n_sources) = source_volume_from(1:n_sources)
-            source_volume_to_temp(1:n_sources)   = source_volume_to(1:n_sources)
+          source_volume_from_temp(1:n_sources) = source_volume_from(1:n_sources)
+          source_volume_to_temp(1:n_sources)   = source_volume_to(1:n_sources)
 
-            DEALLOCATE(source_volume_from)
-            DEALLOCATE(source_volume_to)
+          DEALLOCATE(source_volume_from)
+          DEALLOCATE(source_volume_to)
 
-            ALLOCATE(source_volume_from(n_sources))
-            ALLOCATE(source_volume_to(n_sources))
+          ALLOCATE(source_volume_from(n_sources))
+          ALLOCATE(source_volume_to(n_sources))
 
-            source_volume_from(1:n_sources) = source_volume_from_temp(1:n_sources)
-            source_volume_to(1:n_sources)   = source_volume_to_temp(1:n_sources)
+          source_volume_from(1:n_sources) = source_volume_from_temp(1:n_sources)
+          source_volume_to(1:n_sources)   = source_volume_to_temp(1:n_sources)
 
-            DEALLOCATE(source_volume_from_temp)
-            DEALLOCATE(source_volume_to_temp)
+          DEALLOCATE(source_volume_from_temp)
+          DEALLOCATE(source_volume_to_temp)
 
-         ELSE
+       ELSE
 
-            IF ( vent_flag .GE. 6 ) THEN
+          IF ( vent_flag .GE. 6 ) THEN
 
-               WRITE(*,*)
-               WRITE(*,*) 'ERROR: problem with namelist VENT_PARAMETERS'
-               WRITE(*,*) 'source_probabilities require with VENT_FLAG=7'
-               WRITE(*,*) 'Please check the input file'
-               WRITE(*,*)
-               WRITE(*,vent_parameters)
-               STOP
+             WRITE(*,*)
+             WRITE(*,*) 'ERROR: problem with namelist VENT_PARAMETERS'
+             WRITE(*,*) 'source_probabilities require with VENT_FLAG=7'
+             WRITE(*,*) 'Please check the input file'
+             WRITE(*,*)
+             WRITE(*,vent_parameters)
+             STOP
 
-            END IF
+          END IF
 
-         END IF
+       END IF
 
-         REWIND(input_unit)
+       REWIND(input_unit)
 
-      END IF
+    END IF
 
-      IF ( crop_flag ) THEN
+    IF ( crop_flag ) THEN
 
-         ! ---------- READ crop_parameters NAMELIST -----------------------------------
-         READ(input_unit, crop_parameters,IOSTAT=ios )
+       ! ---------- READ crop_parameters NAMELIST -----------------------------------
+       READ(input_unit, crop_parameters,IOSTAT=ios )
 
-         IF ( ios .NE. 0 ) THEN
+       IF ( ios .NE. 0 ) THEN
 
-            WRITE(*,*) 'IOSTAT=',ios
-            WRITE(*,*) 'ERROR: problem with namelist CROP_PARAMETERS'
-            WRITE(*,*) 'Please check the input file'
-            WRITE(*,crop_parameters)
-            STOP
+          WRITE(*,*) 'IOSTAT=',ios
+          WRITE(*,*) 'ERROR: problem with namelist CROP_PARAMETERS'
+          WRITE(*,*) 'Please check the input file'
+          WRITE(*,crop_parameters)
+          STOP
 
-         ELSE
+       ELSE
 
-            REWIND(input_unit)
+          REWIND(input_unit)
 
-         END IF
+       END IF
 
-      END IF
+    END IF
 
-      ! ---------- READ flow_parameters NAMELIST -----------------------------------
-      READ(input_unit, flow_parameters,IOSTAT=ios )
+    ! ---------- READ flow_parameters NAMELIST -----------------------------------
+    READ(input_unit, flow_parameters,IOSTAT=ios )
 
-      IF ( ios .NE. 0 ) THEN
+    IF ( ios .NE. 0 ) THEN
 
-         WRITE(*,*) 'IOSTAT=',ios
-         WRITE(*,*) 'ERROR: problem with namelist FLOW_PARAMETERS'
-         WRITE(*,*) 'Please check the input file'
-         WRITE(*,flow_parameters)
-         STOP
+       WRITE(*,*) 'IOSTAT=',ios
+       WRITE(*,*) 'ERROR: problem with namelist FLOW_PARAMETERS'
+       WRITE(*,*) 'Please check the input file'
+       WRITE(*,flow_parameters)
+       STOP
 
-      ELSE
+    ELSE
 
-         IF ( max_n_lobes .EQ. -9999 ) THEN
+       IF ( max_n_lobes .EQ. -9999 ) THEN
 
-            max_n_lobes = min_n_lobes
+          max_n_lobes = min_n_lobes
 
-         END IF
+       END IF
 
-         ! Check if volume_flag is set
-         if (volume_flag) then
+       ! Check if volume_flag is set
+       if (volume_flag) then
 
-            ! Fixed dimension flag logic
-            if (fixed_dimension_flag ) then
-               avg_lobe_thickness = total_volume / (n_flows * lobe_area * 0.5     &
+          ! Fixed dimension flag logic
+          if (fixed_dimension_flag ) then
+             avg_lobe_thickness = total_volume / (n_flows * lobe_area * 0.5     &
                   * (min_n_lobes + max_n_lobes))
-               print *, "Average Lobe thickness = ", avg_lobe_thickness, " m"
+             print *, "Average Lobe thickness = ", avg_lobe_thickness, " m"
 
-            else
-               lobe_area = total_volume / (n_flows * avg_lobe_thickness * 0.5     &
+          else
+             lobe_area = total_volume / (n_flows * avg_lobe_thickness * 0.5     &
                   * (min_n_lobes + max_n_lobes))
-               print *, "Lobe area = ", lobe_area, " m2"
+             print *, "Lobe area = ", lobe_area, " m2"
 
-            end if
+          end if
 
-         end if
+       end if
 
-         REWIND(input_unit)
+       REWIND(input_unit)
 
-      END IF
+    END IF
 
-      ! If not provided in the input file, use total_volume as the default
-      ! upper activation bound for each source
-      WHERE ( source_volume_to(1:n_sources) == -9999.0_wp )
-         source_volume_to(1:n_sources) = 1.01_wp*total_volume
-      END WHERE
+    ! If not provided in the input file, use total_volume as the default
+    ! upper activation bound for each source
+    WHERE ( source_volume_to(1:n_sources) == -9999.0_wp )
+       source_volume_to(1:n_sources) = 1.01_wp*total_volume
+    END WHERE
 
-      ! Check that each source activation interval is valid
-      IF ( ANY( source_volume_from(1:n_sources) > source_volume_to(1:n_sources) ) ) THEN
-         WRITE(*,*) 'ERROR: source_volume_from must be less than or equal to source_volume_to'
-         STOP
-      END IF
+    ! Check that each source activation interval is valid
+    IF ( ANY( source_volume_from(1:n_sources) > source_volume_to(1:n_sources) ) ) THEN
+       WRITE(*,*) 'ERROR: source_volume_from must be less than or equal to source_volume_to'
+       STOP
+    END IF
 
-      ! Check that source activation bounds are non-negative
-      IF ( ANY( source_volume_from(1:n_sources) < 0.0_wp ) .OR. &
+    ! Check that source activation bounds are non-negative
+    IF ( ANY( source_volume_from(1:n_sources) < 0.0_wp ) .OR. &
          ANY( source_volume_to(1:n_sources)   < 0.0_wp ) ) THEN
-         WRITE(*,*) 'ERROR: source activation volume bounds must be non-negative'
-         STOP
-      END IF
+       WRITE(*,*) 'ERROR: source activation volume bounds must be non-negative'
+       STOP
+    END IF
 
-      ! Check that source activation bounds do not exceed the total erupted volume
-      IF ( ANY( source_volume_from(1:n_sources) > total_volume ) .OR. &
+    ! Check that source activation bounds do not exceed the total erupted volume
+    IF ( ANY( source_volume_from(1:n_sources) > total_volume ) .OR. &
          ANY( source_volume_to(1:n_sources)   > (1.01_wp*total_volume) ) ) THEN
-         WRITE(*,*) 'ERROR: source activation volume bounds must not exceed total_volume'
-         STOP
-      END IF
+       WRITE(*,*) 'ERROR: source activation volume bounds must not exceed total_volume'
+       STOP
+    END IF
 
-      IF ( restart_flag) THEN
+    IF ( restart_flag) THEN
 
-         ! ---------- READ restart_parameters NAMELIST -----------------------------------
-         READ(input_unit, restart_parameters,IOSTAT=ios )
+       ! ---------- READ restart_parameters NAMELIST -----------------------------------
+       READ(input_unit, restart_parameters,IOSTAT=ios )
 
-         IF ( ios .NE. 0 ) THEN
+       IF ( ios .NE. 0 ) THEN
 
-            WRITE(*,*) 'IOSTAT=',ios
-            WRITE(*,*) 'ERROR: problem with namelist RESTART_PARAMETERS'
-            WRITE(*,*) 'Please check the input file'
-            WRITE(*,restart_parameters)
-            STOP
+          WRITE(*,*) 'IOSTAT=',ios
+          WRITE(*,*) 'ERROR: problem with namelist RESTART_PARAMETERS'
+          WRITE(*,*) 'Please check the input file'
+          WRITE(*,restart_parameters)
+          STOP
 
-         ELSE
+       ELSE
 
-            ALLOCATE(restart_files_temp(n_restarts))
-            ALLOCATE(restart_filling_parameters_temp(n_restarts))
+          ALLOCATE(restart_files_temp(n_restarts))
+          ALLOCATE(restart_filling_parameters_temp(n_restarts))
 
-            restart_files_temp(1:n_restarts) = restart_files(1:n_restarts)
-            restart_filling_parameters_temp(1:n_restarts) = restart_filling_parameters(1:n_restarts)
+          restart_files_temp(1:n_restarts) = restart_files(1:n_restarts)
+          restart_filling_parameters_temp(1:n_restarts) = restart_filling_parameters(1:n_restarts)
 
-            DEALLOCATE(restart_files)
-            DEALLOCATE(restart_filling_parameters)
+          DEALLOCATE(restart_files)
+          DEALLOCATE(restart_filling_parameters)
 
-            ALLOCATE(restart_files(n_restarts))
-            ALLOCATE(restart_filling_parameters(n_restarts))
+          ALLOCATE(restart_files(n_restarts))
+          ALLOCATE(restart_filling_parameters(n_restarts))
 
-            restart_files(:) = restart_files_temp(:)
-            restart_filling_parameters(:) = restart_filling_parameters_temp(:)
+          restart_files(:) = restart_files_temp(:)
+          restart_filling_parameters(:) = restart_filling_parameters_temp(:)
 
-            DEALLOCATE(restart_files_temp)
-            DEALLOCATE(restart_filling_parameters_temp)
+          DEALLOCATE(restart_files_temp)
+          DEALLOCATE(restart_filling_parameters_temp)
 
-            WRITE(*,*) 'restart_files ',restart_files
+          WRITE(*,*) 'restart_files ',restart_files
 
-            REWIND(input_unit)
+          REWIND(input_unit)
 
-         END IF
+       END IF
 
-      END IF
+    END IF
 
 
-      ! ---------- READ numerical_parameters NAMELIST -----------------------------------
-      READ(input_unit, numerical_parameters,IOSTAT=ios )
+    ! ---------- READ numerical_parameters NAMELIST -----------------------------------
+    READ(input_unit, numerical_parameters,IOSTAT=ios )
 
-      IF ( ios .NE. 0 ) THEN
+    IF ( ios .NE. 0 ) THEN
 
-         WRITE(*,*) 'IOSTAT=',ios
-         WRITE(*,*) 'ERROR: problem with namelist NUMERICAL_PARAMETERS'
-         WRITE(*,*) 'Please check the input file'
-         WRITE(*,numerical_parameters)
-         STOP
+       WRITE(*,*) 'IOSTAT=',ios
+       WRITE(*,*) 'ERROR: problem with namelist NUMERICAL_PARAMETERS'
+       WRITE(*,*) 'Please check the input file'
+       WRITE(*,numerical_parameters)
+       STOP
 
-      ELSE
+    ELSE
 
-         nv2 = nv*nv
-         inv_nv2 = 1.0_wp / nv2
-         REWIND(input_unit)
+       nv2 = nv*nv
+       inv_nv2 = 1.0_wp / nv2
+       REWIND(input_unit)
 
-      END IF
+    END IF
 
-      ! ---------- READ numerical_parameters NAMELIST -----------------------------------
-      IF ( union_diff_flag ) THEN
+    ! ---------- READ numerical_parameters NAMELIST -----------------------------------
+    IF ( union_diff_flag ) THEN
 
-         READ(input_unit, union_diff_parameters,IOSTAT=ios )
+       READ(input_unit, union_diff_parameters,IOSTAT=ios )
 
-         IF ( ios .NE. 0 ) THEN
+       IF ( ios .NE. 0 ) THEN
 
-            WRITE(*,*) 'IOSTAT=',ios
-            WRITE(*,*) 'ERROR: problem with namelist UNION_DIFF_PARAMETERS'
-            WRITE(*,*) 'Please check the input file'
-            WRITE(*,union_diff_parameters)
-            STOP
+          WRITE(*,*) 'IOSTAT=',ios
+          WRITE(*,*) 'ERROR: problem with namelist UNION_DIFF_PARAMETERS'
+          WRITE(*,*) 'Please check the input file'
+          WRITE(*,union_diff_parameters)
+          STOP
 
-         ELSE
+       ELSE
 
-            INQUIRE (FILE=union_diff_file,exist=lexist)
+          INQUIRE (FILE=union_diff_file,exist=lexist)
 
-            IF (lexist .EQV. .FALSE.) THEN
+          IF (lexist .EQV. .FALSE.) THEN
 
-               WRITE(*,*) 'Union diff file not found'
-               union_diff_flag = .FALSE.
+             WRITE(*,*) 'Union diff file not found'
+             union_diff_flag = .FALSE.
 
-            END IF
+          END IF
 
-         END IF
+       END IF
 
-      END IF
+    END IF
 
-      !------ search for masking thresholds ---------------------------------------
+    !------ search for masking thresholds ---------------------------------------
 
-      REWIND(input_unit)
+    REWIND(input_unit)
 
-      tend1 = .FALSE.
+    tend1 = .FALSE.
 
-      WRITE(*,*) 'Searching for masking thresholds'
+    WRITE(*,*) 'Searching for masking thresholds'
 
-      n_masking = 0
+    n_masking = 0
 
-      masking_search: DO
+    masking_search: DO
 
-         READ(input_unit,*, END = 300 ) card
+       READ(input_unit,*, END = 300 ) card
 
-         IF( TRIM(card) == 'MASKING_THRESHOLDS' ) THEN
+       IF( TRIM(card) == 'MASKING_THRESHOLDS' ) THEN
 
-            EXIT masking_search
+          EXIT masking_search
 
-         END IF
+       END IF
 
-      END DO masking_search
+    END DO masking_search
 
 
-      READ(input_unit,*) n_masking
+    READ(input_unit,*) n_masking
 
-      WRITE(*,*) 'n_masking ',n_masking
+    WRITE(*,*) 'n_masking ',n_masking
 
-      ALLOCATE( masking_threshold( n_masking ) )
+    ALLOCATE( masking_threshold( n_masking ) )
 
-      DO i = 1, n_masking
+    DO i = 1, n_masking
 
-         READ(input_unit,*) masking_threshold(i)
+       READ(input_unit,*) masking_threshold(i)
 
-         WRITE(*,*) i , masking_threshold(i)
+       WRITE(*,*) i , masking_threshold(i)
 
-      END DO
+    END DO
 
-      GOTO 310
-300   tend1 = .TRUE.
-310   CONTINUE
+    GOTO 310
+300 tend1 = .TRUE.
+310 CONTINUE
 
-      !------ end search for masking thresholds -----------------------------------
+    !------ end search for masking thresholds -----------------------------------
 
-      ! Initialize loop
-      i = 0
-      base_name = run_name
-      condition = .true.
+    ! Initialize loop
+    i = 0
+    base_name = run_name
+    condition = .true.
 
-      ! Loop to find a unique run_name
-      do while (condition)
+    ! Loop to find a unique run_name
+    do while (condition)
 
-         write(run_name, '(A,"_",I3.3)') trim(base_name), i
+       write(run_name, '(A,"_",I3.3)') trim(base_name), i
 
-         write(backup_file, '(A,"_inp.bak")') trim(run_name)
+       write(backup_file, '(A,"_inp.bak")') trim(run_name)
 
-         ! Check if the file exists
-         inquire(file=trim(backup_file), exist=condition)
+       ! Check if the file exists
+       inquire(file=trim(backup_file), exist=condition)
 
-         i = i + 1
-      end do
+       i = i + 1
+    end do
 
-      ! File copy equivalent in Fortran 90
-      call execute_command_line("cp mr_lava_loba.inp "//trim(backup_file))
+    ! File copy equivalent in Fortran 90
+    call execute_command_line("cp mr_lava_loba.inp "//trim(backup_file))
 
-      ! Output the run name
-      print *, 'Run name ', trim(run_name)
-      print *, ''
+    ! Output the run name
+    print *, 'Run name ', trim(run_name)
+    print *, ''
 
-      IF (union_diff_flag) THEN
+    IF (union_diff_flag) THEN
 
-         ud_output_file = trim(run_name) // '_ud.csv'
+       ud_output_file = trim(run_name) // '_ud.csv'
 
-         ! Open the file in append mode
-         OPEN(unit=ud_output_unit, file=ud_output_file, status='unknown',   &
+       ! Open the file in append mode
+       OPEN(unit=ud_output_unit, file=ud_output_file, status='unknown',   &
             action='write', iostat=ud_file)
 
-         IF (ud_file /= 0) THEN
+       IF (ud_file /= 0) THEN
 
-            PRINT *, 'Error opening file:', ud_output_file
-            STOP
+          PRINT *, 'Error opening file:', ud_output_file
+          STOP
 
-         END IF
+       END IF
 
-         WRITE(ud_output_unit, '(A)') 'Masking, Union Area, Intersection Area, '  &
+       WRITE(ud_output_unit, '(A)') 'Masking, Union Area, Intersection Area, '  &
             //'Fitting Parameter, Vol1 in intersection, Vol2 in intersection, ' &
             //'Thickness relative error'
 
-      END IF
+    END IF
 
-      RETURN
+    RETURN
 
-   END SUBROUTINE read_param
+  END SUBROUTINE read_param
 
-   !***********************************************************************
-   !> @brief Read and initialize the topographic grid.
-   !!
-   !! Reads the digital elevation model from the input topography file and
-   !! initializes the arrays describing the computational grid and the
-   !! corresponding topographic elevation field.
-   !!
-   !! The subroutine loads the grid dimensions, spatial resolution, domain
-   !! coordinates, and elevation values, then allocates and fills the
-   !! arrays used by the model to store the original topography and the
-   !! evolving topography modified by lava emplacement. It also computes
-   !! auxiliary grid quantities required by interpolation and rasterization
-   !! procedures.
-   !!
-   !! The subroutine stops with an error message if the topography file
-   !! cannot be opened, if its content is inconsistent with the expected
-   !! format, or if the grid dimensions are invalid.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !!
-   !! @note This subroutine has no explicit input or output arguments.
-   !! It operates on module variables imported from `parameters`.
-   !***********************************************************************
-   SUBROUTINE read_topo
+  !***********************************************************************
+  !> @brief Read and initialize the topographic grid.
+  !!
+  !! Reads the digital elevation model from the input topography file and
+  !! initializes the arrays describing the computational grid and the
+  !! corresponding topographic elevation field.
+  !!
+  !! The subroutine loads the grid dimensions, spatial resolution, domain
+  !! coordinates, and elevation values, then allocates and fills the
+  !! arrays used by the model to store the original topography and the
+  !! evolving topography modified by lava emplacement. It also computes
+  !! auxiliary grid quantities required by interpolation and rasterization
+  !! procedures.
+  !!
+  !! The subroutine stops with an error message if the topography file
+  !! cannot be opened, if its content is inconsistent with the expected
+  !! format, or if the grid dimensions are invalid.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !!
+  !! @note This subroutine has no explicit input or output arguments.
+  !! It operates on module variables imported from `parameters`.
+  !***********************************************************************
+  SUBROUTINE read_topo
 
-      IMPLICIT NONE
+    IMPLICIT NONE
 
-      INTEGER :: i
+    INTEGER :: i
 
-      INTEGER :: cols, rows
+    INTEGER :: cols, rows
 
-      REAL(wp), allocatable :: arr_temp(:,:), xc_temp(:), yc_temp(:)
-      REAL(wp), allocatable :: xc(:) , yc(:)
+    REAL(wp), allocatable :: arr_temp(:,:), xc_temp(:), yc_temp(:)
+    REAL(wp), allocatable :: xc(:) , yc(:)
 
-      REAL(wp) :: xE, xW, yS, yN
+    REAL(wp) :: xE, xW, yS, yN
 
-      CHARACTER*50 :: output_file
+    CHARACTER*50 :: output_file
 
-      CALL read_asc(source,arr_temp, lx, ly, cols, rows, cell, nd)
+    CALL read_asc(source,arr_temp, lx, ly, cols, rows, cell, nd)
 
-      WRITE(*,*) 'Extent of the DEM'
-      WRITE(*,*) 'xW,xE,yS,yN',lx,lx+cols*cell,ly,ly+rows*cell
+    WRITE(*,*) 'Extent of the DEM'
+    WRITE(*,*) 'xW,xE,yS,yN',lx,lx+cols*cell,ly,ly+rows*cell
 
-      allocate(xc_temp(cols))
-      allocate(yc_temp(rows))
+    allocate(xc_temp(cols))
+    allocate(yc_temp(rows))
 
-      WRITE(*,*)
+    WRITE(*,*)
 
-      close(topo_unit)
-
-
-      ! Calculate cell centers
-      do i = 1, cols
-         xc_temp(i) = lx + cell * (0.5 + (i - 1))
-      end do
-      do i = 1, rows
-         yc_temp(i) = ly + cell * (0.5 + (i - 1))
-      end do
-      
-      IF ( crop_flag) THEN
+    close(topo_unit)
 
 
-         xW = MINVAL(x_vent) - west_to_vent
-         xE = MAXVAL(x_vent) + east_to_vent
-         yS = MINVAL(y_vent) - south_to_vent
-         yN = MAXVAL(y_vent) + north_to_vent
+    ! Calculate cell centers
+    do i = 1, cols
+       xc_temp(i) = lx + cell * (0.5 + (i - 1))
+    end do
+    do i = 1, rows
+       yc_temp(i) = ly + cell * (0.5 + (i - 1))
+    end do
 
-         WRITE(*,*) 'Cropping of original DEM'
-         WRITE(*,*) 'xW,xE,yS,yN', xW, xE, yS, yN
+    IF ( crop_flag) THEN
 
-         IF ( ( xW<lx) .OR. ( xE>lx+cols*cell ) .OR. ( yS<ly ) .OR.               &
+
+       xW = MINVAL(x_vent) - west_to_vent
+       xE = MAXVAL(x_vent) + east_to_vent
+       yS = MINVAL(y_vent) - south_to_vent
+       yN = MAXVAL(y_vent) + north_to_vent
+
+       WRITE(*,*) 'Cropping of original DEM'
+       WRITE(*,*) 'xW,xE,yS,yN', xW, xE, yS, yN
+
+       IF ( ( xW<lx) .OR. ( xE>lx+cols*cell ) .OR. ( yS<ly ) .OR.               &
             ( yN>ly+rows*cell ) ) THEN
 
-            WRITE(*,*) 'ERROR: problem with namelist CROP_PARAMETERS'
-            STOP
+          WRITE(*,*) 'ERROR: problem with namelist CROP_PARAMETERS'
+          STOP
 
-         END IF
+       END IF
 
-         ! crop the DEM to the desired domain
-         iW = MAX(0, (floor((xW - lx) / cell)) ) + 1
-         iE = MIN(cols, (ceiling((xE - lx) / cell)) ) + 1
-         jS = MAX(0, (floor((yS - ly) / cell)) ) + 1
-         jN = MIN(rows, (ceiling((yN - ly) / cell)) ) + 1
+       ! crop the DEM to the desired domain
+       iW = MAX(0, (floor((xW - lx) / cell)) ) + 1
+       iE = MIN(cols, (ceiling((xE - lx) / cell)) ) + 1
+       jS = MAX(0, (floor((yS - ly) / cell)) ) + 1
+       jN = MIN(rows, (ceiling((yN - ly) / cell)) ) + 1
 
-         WRITE(*,*) 'iW,iE,jS,jN', iW, iE, jS, jN
-         WRITE(*,*)
+       WRITE(*,*) 'iW,iE,jS,jN', iW, iE, jS, jN
+       WRITE(*,*)
 
-         nx = iE-iW+1
-         ny = jN-jS+1
-         allocate(Ztopo(ny, nx))
-         allocate(xc(nx))
-         ALLOCATE(yc(ny))
+       nx = iE-iW+1
+       ny = jN-jS+1
+       allocate(Ztopo(ny, nx))
+       allocate(xc(nx))
+       ALLOCATE(yc(ny))
 
-         Ztopo = arr_temp(jS:jN,iW:iE)
-         xc = xc_temp(iW:iE)
-         yc = yc_temp(jS:jN)
+       Ztopo = arr_temp(jS:jN,iW:iE)
+       xc = xc_temp(iW:iE)
+       yc = yc_temp(jS:jN)
 
-         lx = xc(1) - 0.5_wp * cell
-         ly = yc(1) - 0.5_wp * cell
+       lx = xc(1) - 0.5_wp * cell
+       ly = yc(1) - 0.5_wp * cell
 
-         WRITE(*,*) 'lx,ly ',lx,ly
+       WRITE(*,*) 'lx,ly ',lx,ly
 
-         output_file = trim(run_name) // '_cropped_DEM.asc'
-         CALL write_asc(Ztopo, output_file, lx, ly, cell, 0.0_wp)
+       output_file = trim(run_name) // '_cropped_DEM.asc'
+       CALL write_asc(Ztopo, output_file, lx, ly, cell, 0.0_wp)
 
-      ELSE
+    ELSE
 
-         nx = cols
-         ny = rows
+       nx = cols
+       ny = rows
 
-         allocate(Ztopo(ny, nx))
-         Ztopo = arr_temp
+       allocate(Ztopo(ny, nx))
+       Ztopo = arr_temp
 
-         allocate(xc(nx))
-         ALLOCATE(yc(ny))
+       allocate(xc(nx))
+       ALLOCATE(yc(ny))
 
-         xc(:) = xc_temp(:)
-         yc(:) = yc_temp(:)
+       xc(:) = xc_temp(:)
+       yc(:) = yc_temp(:)
 
-      END IF
+    END IF
 
-      xcmin = MINVAL(xc)
-      xcmax = MAXVAL(xc)
+    xcmin = MINVAL(xc)
+    xcmax = MAXVAL(xc)
 
-      ycmin = MINVAL(yc)
-      ycmax = MAXVAL(yc)
+    ycmin = MINVAL(yc)
+    ycmax = MAXVAL(yc)
 
-      !WRITE(*,*) 'xcmin,xcmax ',xcmin,xcmax
-      !WRITE(*,*) 'ycmin,ycmax ',ycmin,ycmax
+    !WRITE(*,*) 'xcmin,xcmax ',xcmin,xcmax
+    !WRITE(*,*) 'ycmin,ycmax ',ycmin,ycmax
 
-      allocate(Xtopo(ny, nx))
-      allocate(Ytopo(ny, nx))
+    allocate(Xtopo(ny, nx))
+    allocate(Ytopo(ny, nx))
 
-      do i = 1, ny
+    do i = 1, ny
 
-         Xtopo(i, 1:nx) = xc(1:nx)
-         Ytopo(i, 1:nx) = yc(i)
+       Xtopo(i, 1:nx) = xc(1:nx)
+       Ytopo(i, 1:nx) = yc(i)
 
-      end do
+    end do
 
-      allocate(filling_parameter(ny,nx))
+    allocate(filling_parameter(ny,nx))
 
-      filling_parameter(1:ny,1:nx) = 1.0_wp - thickening_parameter
-      
-      RETURN
+    filling_parameter(1:ny,1:nx) = 1.0_wp - thickening_parameter
 
-   END SUBROUTINE read_topo
+    RETURN
 
-   !***********************************************************************
-   !> @brief Read and apply restart flow fields to the topography.
-   !!
-   !! Loads one or more restart thickness maps from external files and uses
-   !! them to modify the current topography before the simulation starts.
-   !!
-   !! For each restart file, the subroutine reads the raster data and checks
-   !! that grid size, lower-left coordinates, and cell size are consistent
-   !! with the current computational domain. If cropping is enabled, only
-   !! the selected subdomain is extracted; otherwise the full restart field
-   !! is used.
-   !!
-   !! Each restart thickness map is then multiplied by the corresponding
-   !! `restart_filling_parameters` value in order to account for partially
-   !! filled or subsurface flows, and the resulting contribution is added to
-   !! `Ztopo`.
-   !!
-   !! The subroutine stops if the geometry of a restart file is not
-   !! consistent with the current grid.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !!
-   !! @note This subroutine has no explicit input or output arguments.
-   !! It operates on module variables imported from `parameters`.
-   !***********************************************************************
-   SUBROUTINE read_restart
+  END SUBROUTINE read_topo
 
-      IMPLICIT NONE
+  !***********************************************************************
+  !> @brief Read and apply restart flow fields to the topography.
+  !!
+  !! Loads one or more restart thickness maps from external files and uses
+  !! them to modify the current topography before the simulation starts.
+  !!
+  !! For each restart file, the subroutine reads the raster data and checks
+  !! that grid size, lower-left coordinates, and cell size are consistent
+  !! with the current computational domain. If cropping is enabled, only
+  !! the selected subdomain is extracted; otherwise the full restart field
+  !! is used.
+  !!
+  !! Each restart thickness map is then multiplied by the corresponding
+  !! `restart_filling_parameters` value in order to account for partially
+  !! filled or subsurface flows, and the resulting contribution is added to
+  !! `Ztopo`.
+  !!
+  !! The subroutine stops if the geometry of a restart file is not
+  !! consistent with the current grid.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !!
+  !! @note This subroutine has no explicit input or output arguments.
+  !! It operates on module variables imported from `parameters`.
+  !***********************************************************************
+  SUBROUTINE read_restart
 
-      INTEGER :: i_restart
-      REAL(wp), ALLOCATABLE :: Zflow_old(:,:)
-      REAL(wp), ALLOCATABLE :: arr_temp(:,:)
+    IMPLICIT NONE
 
-      REAL(wp) :: lx_re, ly_re, cell_re, nd_re
-      INTEGER :: cols_re, rows_re
+    INTEGER :: i_restart
+    REAL(wp), ALLOCATABLE :: Zflow_old(:,:)
+    REAL(wp), ALLOCATABLE :: arr_temp(:,:)
 
-      REAL(wp) :: filling_parameter_i
+    REAL(wp) :: lx_re, ly_re, cell_re, nd_re
+    INTEGER :: cols_re, rows_re
 
-      ALLOCATE(Zflow_old(ny,nx))
+    REAL(wp) :: filling_parameter_i
 
-      DO i_restart=1, n_restarts
+    ALLOCATE(Zflow_old(ny,nx))
 
-         CALL read_asc(restart_files(i_restart),arr_temp, lx_re, ly_re, cols_re, rows_re, cell_re, nd_re)
+    DO i_restart=1, n_restarts
 
-         IF ( ( cols_re .EQ. cols ) .AND. ( rows_re .EQ. rows ) .AND. ( ABS(lx_re-lx) <= eps ) .AND. &
+       CALL read_asc(restart_files(i_restart),arr_temp, lx_re, ly_re, cols_re, rows_re, cell_re, nd_re)
+
+       IF ( ( cols_re .EQ. cols ) .AND. ( rows_re .EQ. rows ) .AND. ( ABS(lx_re-lx) <= eps ) .AND. &
             ( ABS(ly_re-ly) <= eps ) .AND. ( ABS(cell_re-cell) <= eps ) ) THEN
 
-            WRITE(*,*) "Check on restart size OK"
+          WRITE(*,*) "Check on restart size OK"
 
-         ELSE
+       ELSE
 
-            WRITE(*,*) "Check on restart size FAILED"
-            STOP
+          WRITE(*,*) "Check on restart size FAILED"
+          STOP
 
-         END IF
+       END IF
 
-         IF (crop_flag) THEN
+       IF (crop_flag) THEN
 
-            Zflow_old(1:ny,1:nx) = arr_temp(jS:jN,iW:iE)
+          Zflow_old(1:ny,1:nx) = arr_temp(jS:jN,iW:iE)
 
-         ELSE
+       ELSE
 
-            Zflow_old(1:ny,1:nx) = arr_temp(1:ny,1:nx)
+          Zflow_old(1:ny,1:nx) = arr_temp(1:ny,1:nx)
 
-         END IF
+       END IF
 
-         ! Load the relevant filling_parameter (to account for "subsurface flows")
-         filling_parameter_i = restart_filling_parameters(i_restart)
+       ! Load the relevant filling_parameter (to account for "subsurface flows")
+       filling_parameter_i = restart_filling_parameters(i_restart)
 
-         Ztopo = Ztopo + Zflow_old * filling_parameter_i
+       Ztopo = Ztopo + Zflow_old * filling_parameter_i
 
-         CLOSE(restart_unit)
+       CLOSE(restart_unit)
 
-      END DO
+    END DO
 
-      DEALLOCATE( Zflow_old )
-      DEALLOCATE( arr_temp )
+    DEALLOCATE( Zflow_old )
+    DEALLOCATE( arr_temp )
 
-      RETURN
+    RETURN
 
-   END SUBROUTINE read_restart
+  END SUBROUTINE read_restart
 
-   !***********************************************************************
-   !> @brief Generate masked flow-thickness outputs for prescribed volume thresholds.
-   !!
-   !! Applies a sequence of thickness thresholds to the final flow field
-   !! `Zflow` in order to build masked thickness maps that retain only the
-   !! cells whose thickness exceeds the selected threshold.
-   !!
-   !! For each value in `masking_threshold`, the subroutine increases the
-   !! thickness cutoff in steps of `0.1 * avg_lobe_thickness` until the
-   !! fraction of retained flow volume becomes smaller than the requested
-   !! threshold. The corresponding masked field is stored in `Zflow_mask`,
-   !! and diagnostic quantities such as retained volume, retained area, and
-   !! average thickness are printed.
-   !!
-   !! Depending on the output flags, the masked map is then written either
-   !! in NetCDF format, ASCII format, or both. If `union_diff_flag` is
-   !! enabled, the subroutine also evaluates the union/intersection-based
-   !! fit metrics for the masked result.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !!
-   !! @note This subroutine has no explicit input or output arguments.
-   !! It operates on module variables imported from `parameters` and `flow`.
-   !***********************************************************************
-   SUBROUTINE write_masking
+  !***********************************************************************
+  !> @brief Generate masked flow-thickness outputs for prescribed volume thresholds.
+  !!
+  !! Applies a sequence of thickness thresholds to the final flow field
+  !! `Zflow` in order to build masked thickness maps that retain only the
+  !! cells whose thickness exceeds the selected threshold.
+  !!
+  !! For each value in `masking_threshold`, the subroutine increases the
+  !! thickness cutoff in steps of `0.1 * avg_lobe_thickness` until the
+  !! fraction of retained flow volume becomes smaller than the requested
+  !! threshold. The corresponding masked field is stored in `Zflow_mask`,
+  !! and diagnostic quantities such as retained volume, retained area, and
+  !! average thickness are printed.
+  !!
+  !! Depending on the output flags, the masked map is then written either
+  !! in NetCDF format, ASCII format, or both. If `union_diff_flag` is
+  !! enabled, the subroutine also evaluates the union/intersection-based
+  !! fit metrics for the masked result.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !!
+  !! @note This subroutine has no explicit input or output arguments.
+  !! It operates on module variables imported from `parameters` and `flow`.
+  !***********************************************************************
+  SUBROUTINE write_masking
 
-      USE flow, ONLY : Zflow, Zflow_mask
+    USE flow, ONLY : Zflow, Zflow_mask
 
-      IMPLICIT NONE
+    IMPLICIT NONE
 
-      INTEGER :: i_thr, i
-      INTEGER :: max_lobes
+    INTEGER :: i_thr, i
+    INTEGER :: max_lobes
 
-      REAL(wp) :: total_Zflow, total_masked_Zflow
-      REAL(wp) :: threshold
-      REAL(wp) :: volume_fraction
-      CHARACTER(LEN=50) :: masked_file, masking_str1, masking_str2
-      REAL(wp) :: masked_area
+    REAL(wp) :: total_Zflow, total_masked_Zflow
+    REAL(wp) :: threshold
+    REAL(wp) :: volume_fraction
+    CHARACTER(LEN=50) :: masked_file, masking_str1, masking_str2
+    REAL(wp) :: masked_area
 
-      max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
+    max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
 
-      ! Sum the values in Zflow
-      total_Zflow = sum(Zflow)
+    ! Sum the values in Zflow
+    total_Zflow = sum(Zflow)
 
-      DO i_thr = 1,n_masking
+    DO i_thr = 1,n_masking
 
-         DO i = 1,10*max_lobes
+       DO i = 1,10*max_lobes
 
-            threshold = i * 0.1_wp * avg_lobe_thickness
+          threshold = i * 0.1_wp * avg_lobe_thickness
 
-            Zflow_mask = Zflow * MERGE(1.0_wp, 0.0_wp, Zflow.GT.threshold)
-            masked_area = cell**2 * SUM(MERGE(1.0_wp, 0.0_wp, Zflow.GT.threshold))
-            total_masked_Zflow = SUM(Zflow_mask)
+          Zflow_mask = Zflow * MERGE(1.0_wp, 0.0_wp, Zflow.GT.threshold)
+          masked_area = cell**2 * SUM(MERGE(1.0_wp, 0.0_wp, Zflow.GT.threshold))
+          total_masked_Zflow = SUM(Zflow_mask)
 
-            volume_fraction = total_masked_Zflow / total_Zflow
+          volume_fraction = total_masked_Zflow / total_Zflow
 
-            IF (volume_fraction < masking_threshold(i_thr)) THEN
+          IF (volume_fraction < masking_threshold(i_thr)) THEN
 
-               WRITE(*,*)
-               WRITE(*,*) 'Masking threshold', masking_threshold(i_thr)
-               WRITE(*,*) 'Total volume (m3) =', cell**2 * total_Zflow,           &
+             WRITE(*,*)
+             WRITE(*,*) 'Masking threshold', masking_threshold(i_thr)
+             WRITE(*,*) 'Total volume (m3) =', cell**2 * total_Zflow,           &
                   'Masked volume (m3) =', cell**2 * total_masked_Zflow,         &
                   'Volume fraction =', volume_fraction
 
-               WRITE(*,*) 'Total area', cell**2 * sum(merge(0,1,Zflow > 0.0_wp)), &
+             WRITE(*,*) 'Total area', cell**2 * sum(merge(0,1,Zflow > 0.0_wp)), &
                   ' m2 Masked area',masked_area, &
                   ' m2'
 
-               WRITE(*,*) 'Average thickness full',                               &
+             WRITE(*,*) 'Average thickness full',                               &
                   total_Zflow / sum(merge(0,1,Zflow.GT.0.0_wp)),                &
                   ' m Average thickness mask', sum(Zflow*Zflow_mask) /          &
                   masked_area, ' m'
 
-               ! Convert the masking_threshold value to a string and replace '.' with '_'
-               write(masking_str1, '(F6.2)') masking_threshold(i_thr)
-               masking_str1 = adjustl(masking_str1)
-               call replace_dot(masking_str1, masking_str2)
+             ! Convert the masking_threshold value to a string and replace '.' with '_'
+             write(masking_str1, '(F6.2)') masking_threshold(i_thr)
+             masking_str1 = adjustl(masking_str1)
+             call replace_dot(masking_str1, masking_str2)
 
-               IF ( nc_flag ) THEN
+             IF ( nc_flag ) THEN
 
-                  ! Concatenate the strings
-                  masked_file = trim(run_name) // '_thickness_masked_' // trim(masking_str2) // '.nc'
+                ! Concatenate the strings
+                masked_file = trim(run_name) // '_thickness_masked_' // trim(masking_str2) // '.nc'
 
-                  CALL write_netcdf_2d(Zflow_mask,  masked_file, lx, ly, cell, 0.0_wp, 'm', 33 )
+                CALL write_netcdf_2d(Zflow_mask,  masked_file, lx, ly, cell, 0.0_wp, 'm')
 
-               END IF
+             END IF
 
-               IF ( asc_flag ) THEN
+             IF ( asc_flag ) THEN
 
-                  ! Concatenate the strings
-                  masked_file = trim(run_name) // '_thickness_masked_' // trim(masking_str2) // '.asc'
+                ! Concatenate the strings
+                masked_file = trim(run_name) // '_thickness_masked_' // trim(masking_str2) // '.asc'
 
-                  CALL write_asc(Zflow_mask, masked_file, lx, ly, cell, 0.0_wp)
+                CALL write_asc(Zflow_mask, masked_file, lx, ly, cell, 0.0_wp)
 
-               END IF
+             END IF
 
-               EXIT
+             EXIT
 
-            END IF
+          END IF
 
-         END DO
+       END DO
 
-         IF (union_diff_flag) THEN
+       IF (union_diff_flag) THEN
 
-            CALL eval_union_diff(Zflow_mask, masking_threshold(i_thr))
+          CALL eval_union_diff(Zflow_mask, masking_threshold(i_thr))
 
-         END IF
+       END IF
 
-      END DO
+    END DO
 
-      IF (union_diff_flag) CLOSE(ud_output_unit)
+    IF (union_diff_flag) CLOSE(ud_output_unit)
 
-      RETURN
+    RETURN
 
-   END SUBROUTINE write_masking
+  END SUBROUTINE write_masking
 
-   !***********************************************************************
-   !> @brief Initialize the reference grid used for union/intersection analysis.
-   !!
-   !! Reads the raster file specified by `union_diff_file` and initializes
-   !! the array `Zud`, which is used as the reference field for subsequent
-   !! union/intersection and thickness-difference comparisons.
-   !!
-   !! The subroutine first loads the external raster and checks whether its
-   !! grid geometry is consistent with the current computational domain in
-   !! terms of number of rows and columns, lower-left coordinates, and cell
-   !! size. If the grids are consistent, the raster is copied directly into
-   !! `Zud`. Otherwise, the input raster is interpolated onto the current
-   !! topographic grid using `interp2Dgrids`, and the interpolated field is
-   !! assigned to `Zud`.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !!
-   !! @note This subroutine has no explicit input or output arguments.
-   !! It operates on module variables imported from `parameters` and `flow`.
-   !***********************************************************************
-   SUBROUTINE init_union_diff
+  !***********************************************************************
+  !> @brief Initialize the reference grid used for union/intersection analysis.
+  !!
+  !! Reads the raster file specified by `union_diff_file` and initializes
+  !! the array `Zud`, which is used as the reference field for subsequent
+  !! union/intersection and thickness-difference comparisons.
+  !!
+  !! The subroutine first loads the external raster and checks whether its
+  !! grid geometry is consistent with the current computational domain in
+  !! terms of number of rows and columns, lower-left coordinates, and cell
+  !! size. If the grids are consistent, the raster is copied directly into
+  !! `Zud`. Otherwise, the input raster is interpolated onto the current
+  !! topographic grid using `interp2Dgrids`, and the interpolated field is
+  !! assigned to `Zud`.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !!
+  !! @note This subroutine has no explicit input or output arguments.
+  !! It operates on module variables imported from `parameters` and `flow`.
+  !***********************************************************************
+  SUBROUTINE init_union_diff
 
-      USE flow, ONLY : Zflow, Zud
+    USE flow, ONLY : Zflow, Zud
 
-      IMPLICIT NONE
+    IMPLICIT NONE
 
-      REAL(wp) :: lx_ud, ly_ud
-      INTEGER :: cols_ud, rows_ud
-      REAL(wp) :: cell_ud
-      REAL(wp) :: nd_ud
-      REAL(wp), ALLOCATABLE :: xin_1D(:), yin_1D(:), Zs_ud(:,:), Zout_2D(:,:)
+    REAL(wp) :: lx_ud, ly_ud
+    INTEGER :: cols_ud, rows_ud
+    REAL(wp) :: cell_ud
+    REAL(wp) :: nd_ud
+    REAL(wp), ALLOCATABLE :: xin_1D(:), yin_1D(:), Zs_ud(:,:), Zout_2D(:,:)
 
-      INTEGER :: i, max_lobes
+    INTEGER :: i, max_lobes
 
-      max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
+    max_lobes = floor(MAXVAL(Zflow)/avg_lobe_thickness)
 
-      CALL read_asc(union_diff_file,Zs_ud, lx_ud, ly_ud, cols_ud, rows_ud, cell_ud, nd_ud)
+    CALL read_asc(union_diff_file,Zs_ud, lx_ud, ly_ud, cols_ud, rows_ud, cell_ud, nd_ud)
 
-      ! WRITE(*,*) lx_ud, ly_ud, cols_ud, rows_ud, cell_ud
-      ! WRITE(*,*) lx, ly, size(Zflow,2), size(Zflow,1), cell
+    ! WRITE(*,*) lx_ud, ly_ud, cols_ud, rows_ud, cell_ud
+    ! WRITE(*,*) lx, ly, size(Zflow,2), size(Zflow,1), cell
 
-      IF ( ( cols_ud .NE. size(Zflow,2)) .OR. (rows_ud .NE. size(Zflow,1)) .OR.&
+    IF ( ( cols_ud .NE. size(Zflow,2)) .OR. (rows_ud .NE. size(Zflow,1)) .OR.&
          ( ABS(lx_ud-lx)>=eps ) .OR. ( ABS(ly_ud-ly)>=eps ) .OR. ( ABS(cell_ud-cell)>=eps ) ) THEN
 
-         WRITE(*,*) "Union_diff_file", union_diff_file
-         WRITE(*,*) "Different header: interpolating data"
+       WRITE(*,*) "Union_diff_file", union_diff_file
+       WRITE(*,*) "Different header: interpolating data"
 
-         ALLOCATE( xin_1D(cols_ud) , yin_1D(rows_ud) )
+       ALLOCATE( xin_1D(cols_ud) , yin_1D(rows_ud) )
 
-         ! Calculate cell centers
-         do i = 1, cols_ud
-            xin_1D(i) = lx_ud + cell_ud * (0.5 + (i - 1))
-         end do
-         do i = 1, rows_ud
-            yin_1D(i) = ly_ud + cell_ud * (0.5 + (i - 1))
-         end do
+       ! Calculate cell centers
+       do i = 1, cols_ud
+          xin_1D(i) = lx_ud + cell_ud * (0.5 + (i - 1))
+       end do
+       do i = 1, rows_ud
+          yin_1D(i) = ly_ud + cell_ud * (0.5 + (i - 1))
+       end do
 
-         CALL interp2Dgrids(xin_1D, yin_1D, Zs_ud, Xtopo, Ytopo, Zout_2D)
+       CALL interp2Dgrids(xin_1D, yin_1D, Zs_ud, Xtopo, Ytopo, Zout_2D)
 
-         DEALLOCATE( xin_1D , yin_1D )
-         DEALLOCATE( Zs_ud )
-         Zud = Zout_2D
-         DEALLOCATE( Zout_2D )
+       DEALLOCATE( xin_1D , yin_1D )
+       DEALLOCATE( Zs_ud )
+       Zud = Zout_2D
+       DEALLOCATE( Zout_2D )
 
-      ELSE
+    ELSE
 
-         Zud = Zs_ud
+       Zud = Zs_ud
 
-      END IF
+    END IF
 
-      RETURN
+    RETURN
 
-   END SUBROUTINE init_union_diff
+  END SUBROUTINE init_union_diff
 
-   !***********************************************************************
-   !> @brief Evaluate union, intersection, and thickness mismatch metrics.
-   !!
-   !! Compares the input thickness field `Z_check` with the reference field
-   !! `Zud` and computes area- and volume-based similarity metrics for the
-   !! cells where the two fields overlap.
-   !!
-   !! The subroutine evaluates the union area and intersection area of the
-   !! two nonzero fields, computes the corresponding fitting parameter as
-   !! the ratio between intersection and union area, and then estimates the
-   !! flow volumes of `Zud` and `Z_check` over the intersection only.
-   !! It also computes the absolute thickness-volume difference over the
-   !! intersection and reports the corresponding relative error.
-   !!
-   !! The computed metrics are printed to standard output and written to the
-   !! union-difference output file together with the threshold value
-   !! `thr_value`.
-   !!
-   !! @param[in] Z_check   Thickness field to be compared with the
-   !!                      reference field `Zud`.
-   !! @param[in] thr_value Threshold value associated with the current
-   !!                      masked field evaluation.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !***********************************************************************
-   SUBROUTINE eval_union_diff(Z_check,thr_value)
+  !***********************************************************************
+  !> @brief Evaluate union, intersection, and thickness mismatch metrics.
+  !!
+  !! Compares the input thickness field `Z_check` with the reference field
+  !! `Zud` and computes area- and volume-based similarity metrics for the
+  !! cells where the two fields overlap.
+  !!
+  !! The subroutine evaluates the union area and intersection area of the
+  !! two nonzero fields, computes the corresponding fitting parameter as
+  !! the ratio between intersection and union area, and then estimates the
+  !! flow volumes of `Zud` and `Z_check` over the intersection only.
+  !! It also computes the absolute thickness-volume difference over the
+  !! intersection and reports the corresponding relative error.
+  !!
+  !! The computed metrics are printed to standard output and written to the
+  !! union-difference output file together with the threshold value
+  !! `thr_value`.
+  !!
+  !! @param[in] Z_check   Thickness field to be compared with the
+  !!                      reference field `Zud`.
+  !! @param[in] thr_value Threshold value associated with the current
+  !!                      masked field evaluation.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !***********************************************************************
+  SUBROUTINE eval_union_diff(Z_check,thr_value)
 
-      USE flow, ONLY : Zud, Zflow
+    USE flow, ONLY : Zud, Zflow
 
-      IMPLICIT NONE
+    IMPLICIT NONE
 
-      REAL(wp), INTENT(IN) :: Z_check(:,:)
-      REAL(wp), INTENT(IN) :: thr_value
+    REAL(wp), INTENT(IN) :: Z_check(:,:)
+    REAL(wp), INTENT(IN) :: thr_value
 
-      REAL(wp) :: area_union, area_inters
-      REAL(wp) :: fitting_parameter
-      REAL(wp) :: Zud_vol, Zcheck_vol, vol_diff
-      REAL(wp) :: total_masked_Zflow
-      REAL(wp) :: rel_err_vol
+    REAL(wp) :: area_union, area_inters
+    REAL(wp) :: fitting_parameter
+    REAL(wp) :: Zud_vol, Zcheck_vol, vol_diff
+    REAL(wp) :: total_masked_Zflow
+    REAL(wp) :: rel_err_vol
 
-      area_union = cell**2 * REAL(count( MAX(Zud, Z_check) > 0 ))
-      area_inters = cell**2 * REAL(count( MIN(Zud, Z_check) > 0 ))
+    area_union = cell**2 * REAL(count( MAX(Zud, Z_check) > 0 ))
+    area_inters = cell**2 * REAL(count( MIN(Zud, Z_check) > 0 ))
 
-      fitting_parameter = area_inters / area_union
+    fitting_parameter = area_inters / area_union
 
-      WRITE(*,*) ''
-      WRITE(*,*) 'With masking threshold', thr_value
-      WRITE(*,*) 'Union area', area_union, 'm2'
-      WRITE(*,*) 'Intersection area', area_inters, 'm2'
-      WRITE(*,*) 'Fitting parameter', fitting_parameter
+    WRITE(*,*) ''
+    WRITE(*,*) 'With masking threshold', thr_value
+    WRITE(*,*) 'Union area', area_union, 'm2'
+    WRITE(*,*) 'Intersection area', area_inters, 'm2'
+    WRITE(*,*) 'Fitting parameter', fitting_parameter
 
-      Zud_vol = cell**2 * SUM(Zud *                                               &
+    Zud_vol = cell**2 * SUM(Zud *                                               &
          MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
 
-      Zcheck_vol = cell**2 * SUM(Z_check *                                        &
+    Zcheck_vol = cell**2 * SUM(Z_check *                                        &
          MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
 
-      vol_diff = cell**2 * SUM(ABS(Zud-Z_check) *                                 &
+    vol_diff = cell**2 * SUM(ABS(Zud-Z_check) *                                 &
          MERGE(1.0_wp,0.0_wp, MIN(Zud, Z_check) .GT. 0.0_wp ))
 
-      WRITE(*,*) 'Volume 1 in intersection', Zud_vol,                             &
+    WRITE(*,*) 'Volume 1 in intersection', Zud_vol,                             &
          'm3 Volume 2 in intersection', Zcheck_vol, 'm3'
 
-      total_masked_Zflow = sum(Zflow*Z_check)
+    total_masked_Zflow = sum(Zflow*Z_check)
 
-      rel_err_vol = vol_diff / MAX(Zud_vol, Zcheck_vol)
+    rel_err_vol = vol_diff / MAX(Zud_vol, Zcheck_vol)
 
-      WRITE(*,*) 'Thickness relative error', rel_err_vol
-      WRITE(*,*) '--------------------------------'
+    WRITE(*,*) 'Thickness relative error', rel_err_vol
+    WRITE(*,*) '--------------------------------'
 
 
-      WRITE(ud_output_unit, '(ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4)') &
+    WRITE(ud_output_unit, '(ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4, A, ES12.4)') &
          thr_value, ' , ', area_union, ' , ', area_inters, ' , ', fitting_parameter, &
          ' , ', Zud_vol, ' , ', Zcheck_vol, ' , ', rel_err_vol
 
 
-   END SUBROUTINE eval_union_diff
+  END SUBROUTINE eval_union_diff
 
-   !***********************************************************************
-   !> @brief Read an ESRI ASCII raster grid from file.
-   !!
-   !! Opens an ASCII raster file in ESRI grid format, reads its header
-   !! information, and loads the raster values into the output array
-   !! `asc_array`.
-   !!
-   !! The subroutine extracts the grid origin coordinates, number of
-   !! columns and rows, cell size, and no-data value from the file header,
-   !! then allocates and fills the raster array accordingly. The resulting
-   !! array and metadata can be used for topography, restart maps, or other
-   !! gridded input fields required by the model.
-   !!
-   !! The subroutine stops with an error message if the file cannot be
-   !! opened or if its content is inconsistent with the expected ASCII grid
-   !! format.
-   !!
-   !! @param[in]  asc_file   Name of the ASCII raster file to read.
-   !! @param[out] asc_array  Two-dimensional array containing the raster
-   !!                        values read from file.
-   !! @param[out] x0         X coordinate of the lower-left corner of the
-   !!                        raster domain.
-   !! @param[out] y0         Y coordinate of the lower-left corner of the
-   !!                        raster domain.
-   !! @param[out] cols       Number of columns of the raster grid.
-   !! @param[out] rows       Number of rows of the raster grid.
-   !! @param[out] cell_size  Grid cell size.
-   !! @param[out] nodata     No-data value defined in the raster file.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !***********************************************************************
-   SUBROUTINE read_asc(asc_file,asc_array, x0, y0, cols, rows, cell_size, nodata)
+  !***********************************************************************
+  !> @brief Read an ESRI ASCII raster grid from file.
+  !!
+  !! Opens an ASCII raster file in ESRI grid format, reads its header
+  !! information, and loads the raster values into the output array
+  !! `asc_array`.
+  !!
+  !! The subroutine extracts the grid origin coordinates, number of
+  !! columns and rows, cell size, and no-data value from the file header,
+  !! then allocates and fills the raster array accordingly. The resulting
+  !! array and metadata can be used for topography, restart maps, or other
+  !! gridded input fields required by the model.
+  !!
+  !! The subroutine stops with an error message if the file cannot be
+  !! opened or if its content is inconsistent with the expected ASCII grid
+  !! format.
+  !!
+  !! @param[in]  asc_file   Name of the ASCII raster file to read.
+  !! @param[out] asc_array  Two-dimensional array containing the raster
+  !!                        values read from file.
+  !! @param[out] x0         X coordinate of the lower-left corner of the
+  !!                        raster domain.
+  !! @param[out] y0         Y coordinate of the lower-left corner of the
+  !!                        raster domain.
+  !! @param[out] cols       Number of columns of the raster grid.
+  !! @param[out] rows       Number of rows of the raster grid.
+  !! @param[out] cell_size  Grid cell size.
+  !! @param[out] nodata     No-data value defined in the raster file.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !***********************************************************************
+  SUBROUTINE read_asc(asc_file,asc_array, x0, y0, cols, rows, cell_size, nodata)
 
-      IMPLICIT NONE
+    IMPLICIT NONE
 
-      CHARACTER*50, INTENT(IN) :: asc_file
-      REAL(wp), ALLOCATABLE, INTENT(OUT) :: asc_array(:,:)
-      REAL(wp), INTENT(OUT) :: x0, y0
-      INTEGER, INTENT(OUT) :: cols, rows
-      REAL(wp), INTENT(OUT) :: cell_size
-      REAL(wp), INTENT(OUT) :: nodata
+    CHARACTER*50, INTENT(IN) :: asc_file
+    REAL(wp), ALLOCATABLE, INTENT(OUT) :: asc_array(:,:)
+    REAL(wp), INTENT(OUT) :: x0, y0
+    INTEGER, INTENT(OUT) :: cols, rows
+    REAL(wp), INTENT(OUT) :: cell_size
+    REAL(wp), INTENT(OUT) :: nodata
 
-      LOGICAL :: lexist
-      INTEGER :: i
-      REAL(wp), ALLOCATABLE :: buffer(:,:)
-      CHARACTER(LEN=15) :: chara
-
-
-      INQUIRE(FILE=asc_file,EXIST=lexist)
-
-      IF (lexist) THEN
-
-         OPEN(asc_unit, file=asc_file, status='old', action='read')
-
-      ELSE
-
-         WRITE(*,*) 'no ascii file: ',TRIM(asc_file)
-         STOP
-
-      ENDIF
-
-      READ(asc_unit,*) chara, cols
-      READ(asc_unit,*) chara, rows
-      READ(asc_unit,*) chara, x0
-      READ(asc_unit,*) chara, y0
-      READ(asc_unit,*) chara, cell_size
-      READ(asc_unit,*) chara, nodata
-
-      ! Allocate the arrays based on dimensions
-      allocate(buffer(cols, rows))
-      allocate(asc_array(rows, cols))
-
-      WRITE(*,*)
-      WRITE(*,*) 'Reading DEM file:',TRIM(asc_file)
-
-      read(asc_unit, *) buffer
-
-      ! Flip the buffer vertically into the data array
-      do i = 1, rows
-         asc_array(i, :) = buffer(:,rows - i + 1)  ! Flip by copying rows in reverse order
-      end do
-
-      deallocate(buffer)
-      close(asc_unit)
-
-      RETURN
-
-   END SUBROUTINE read_asc
-
-   !***********************************************************************
-   !> @brief Write a two-dimensional array to an ESRI ASCII raster file.
-   !!
-   !! Exports the input array `out_array` to an ASCII raster file in ESRI
-   !! grid format, using the provided grid origin, cell size, and no-data
-   !! value.
-   !!
-   !! The subroutine writes the standard raster header, including the
-   !! number of columns and rows inferred from the array dimensions, the
-   !! lower-left corner coordinates, the cell size, and the no-data value.
-   !! It then writes the array values row by row to the output file.
-   !!
-   !! This routine is used to save model results and derived raster fields
-   !! in a format that can be directly imported into GIS software.
-   !!
-   !! @param[in] out_array    Two-dimensional array to be written to file.
-   !! @param[in] output_file  Name of the output ASCII raster file.
-   !! @param[in] x0           X coordinate of the lower-left corner of the
-   !!                         raster domain.
-   !! @param[in] y0           Y coordinate of the lower-left corner of the
-   !!                         raster domain.
-   !! @param[in] cell_size    Grid cell size.
-   !! @param[in] nodata       No-data value to be written in the raster
-   !!                         header.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !***********************************************************************
-   SUBROUTINE write_asc(out_array, output_file, x0, y0, cell_size, nodata)
-
-      IMPLICIT NONE
-
-      REAL(wp), INTENT(IN) :: out_array(:,:)
-      CHARACTER*50, INTENT(IN) :: output_file
-      REAL(wp), INTENT(IN) :: x0, y0
-      REAL(wp), INTENT(IN) :: cell_size
-      REAL(wp), INTENT(IN) :: nodata
-
-      INTEGER :: out_cells_x, out_cells_y
-      INTEGER :: j
-
-      WRITE(*,*) "Saving asc file: ", TRIM(output_file)
-
-      OPEN(output_unit,FILE=TRIM(output_file),status='unknown',form='formatted')
-
-      out_cells_y = size(out_array, 1)
-      out_cells_x = size(out_array, 2)
-
-      WRITE(output_unit,'(A,I5)') 'ncols ', out_cells_x
-      WRITE(output_unit,'(A,I5)') 'nrows ', out_cells_y
-      WRITE(output_unit,'(A,F15.3)') 'xllcorner ', x0
-      WRITE(output_unit,'(A,F15.3)') 'yllcorner ', y0
-      WRITE(output_unit,'(A,F15.3)') 'cellsize ', cell_size
-      WRITE(output_unit,'(A,F15.3)') 'NODATA_value ', nodata
+    LOGICAL :: lexist
+    INTEGER :: i
+    REAL(wp), ALLOCATABLE :: buffer(:,:)
+    CHARACTER(LEN=15) :: chara
 
 
-      DO j = out_cells_y,1,-1
+    INQUIRE(FILE=asc_file,EXIST=lexist)
 
-         WRITE(output_unit,'(2000ES12.3E3)') out_array(j,1:out_cells_x)
+    IF (lexist) THEN
 
-      ENDDO
+       OPEN(asc_unit, file=asc_file, status='old', action='read')
 
-      CLOSE(output_unit)
+    ELSE
 
-      WRITE(*,*) "Saving completed"
+       WRITE(*,*) 'no ascii file: ',TRIM(asc_file)
+       STOP
 
-   END SUBROUTINE write_asc
+    ENDIF
 
-   !***********************************************************************
-   !> @brief Replace dots with underscores in a character string.
-   !!
-   !! Scans the input string `in_str` and copies it into `out_str` after
-   !! replacing every occurrence of the character `'.'` with `'_'`.
-   !!
-   !! This routine is useful when preparing file names or variable-like
-   !! strings that should avoid dots in intermediate or derived text
-   !! representations.
-   !!
-   !! @param[in]  in_str   Input character string.
-   !! @param[out] out_str  Output character string with dots replaced by
-   !!                      underscores.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !***********************************************************************
-   SUBROUTINE replace_dot(in_str, out_str)
+    READ(asc_unit,*) chara, cols
+    READ(asc_unit,*) chara, rows
+    READ(asc_unit,*) chara, x0
+    READ(asc_unit,*) chara, y0
+    READ(asc_unit,*) chara, cell_size
+    READ(asc_unit,*) chara, nodata
 
-      character(len=*), intent(in) :: in_str
-      character(len=*), intent(out) :: out_str
-      integer :: i
-      out_str = in_str
-      do i = 1, len_trim(in_str)
-         if (out_str(i:i) == '.') out_str(i:i) = '_'
-      end do
-   end subroutine replace_dot
+    ! Allocate the arrays based on dimensions
+    allocate(buffer(cols, rows))
+    allocate(asc_array(rows, cols))
 
-   !***********************************************************************
-   !> @brief Write a two-dimensional array to a NetCDF raster file.
-   !!
-   !! Exports the input array `out_array` to a NetCDF file, together with
-   !! the spatial metadata needed to describe the computational grid.
-   !!
-   !! The subroutine defines the two-dimensional variable associated with
-   !! the raster field, writes the x and y coordinate axes based on the
-   !! lower-left corner coordinates and the grid cell size, and stores the
-   !! no-data value and additional metadata such as physical units and UTM
-   !! zone information.
-   !!
-   !! This routine is used to save model outputs in NetCDF format for
-   !! post-processing, visualization, and interoperability with external
-   !! analysis tools.
-   !!
-   !! @param[in] out_array      Two-dimensional array to be written to the
-   !!                           NetCDF file.
-   !! @param[in] output_file    Name of the output NetCDF file.
-   !! @param[in] x0             X coordinate of the lower-left corner of the
-   !!                           raster domain.
-   !! @param[in] y0             Y coordinate of the lower-left corner of the
-   !!                           raster domain.
-   !! @param[in] cell_size      Grid cell size.
-   !! @param[in] nodata_value   No-data value assigned to missing or invalid
-   !!                           cells.
-   !! @param[in] units          Physical units associated with the raster
-   !!                           variable.
-   !! @param[in] utm_zone       UTM zone metadata associated with the grid.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !***********************************************************************
-   SUBROUTINE write_netcdf_2d(out_array, output_file, x0, y0, cell_size,       &
-      nodata_value, units, utm_zone)
+    WRITE(*,*)
+    WRITE(*,*) 'Reading DEM file:',TRIM(asc_file)
 
-      use netcdf
-      implicit none
+    read(asc_unit, *) buffer
 
-      ! Arguments
-      REAL(wp), intent(in) :: out_array(ny,nx)           ! 2D array of data
-      CHARACTER*50, INTENT(IN) :: output_file
-      REAL(wp), INTENT(IN) :: x0, y0
-      REAL(wp), INTENT(IN) :: cell_size
-      REAL(wp), intent(in) :: nodata_value        ! NoData (missing) value for the data array
-      character(len=*), intent(in) :: units      ! Units of the data (e.g., 'meters', 'temperature')
-      INTEGER, intent(in) :: utm_zone            ! UTM zone (e.g., 33, 34)
+    ! Flip the buffer vertically into the data array
+    do i = 1, rows
+       asc_array(i, :) = buffer(:,rows - i + 1)  ! Flip by copying rows in reverse order
+    end do
 
-      ! integer :: nx, ny              ! Dimensions of the data array
-      REAL(wp) :: x_coords(nx)         ! 1D array of x-coordinates (UTM Easting)
-      REAL(wp) :: y_coords(ny)         ! 1D array of y-coordinates (UTM Northing)
+    deallocate(buffer)
+    close(asc_unit)
 
-      ! Local variables
-      integer :: ncid, x_dimid, y_dimid, varid_data, varid_x, varid_y, retval, crs_varid, varid
-      integer :: data_dimids(2)
+    RETURN
 
-      ! character(len=100) :: crs                  ! Projection string
-      character(len=16) :: crs_name
+  END SUBROUTINE read_asc
 
-      INTEGER :: i
+  !***********************************************************************
+  !> @brief Write a two-dimensional array to an ESRI ASCII raster file.
+  !!
+  !! Exports the input array `out_array` to an ASCII raster file in ESRI
+  !! grid format, using the provided grid origin, cell size, and no-data
+  !! value.
+  !!
+  !! The subroutine writes the standard raster header, including the
+  !! number of columns and rows inferred from the array dimensions, the
+  !! lower-left corner coordinates, the cell size, and the no-data value.
+  !! It then writes the array values row by row to the output file.
+  !!
+  !! This routine is used to save model results and derived raster fields
+  !! in a format that can be directly imported into GIS software.
+  !!
+  !! @param[in] out_array    Two-dimensional array to be written to file.
+  !! @param[in] output_file  Name of the output ASCII raster file.
+  !! @param[in] x0           X coordinate of the lower-left corner of the
+  !!                         raster domain.
+  !! @param[in] y0           Y coordinate of the lower-left corner of the
+  !!                         raster domain.
+  !! @param[in] cell_size    Grid cell size.
+  !! @param[in] nodata       No-data value to be written in the raster
+  !!                         header.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !***********************************************************************
+  SUBROUTINE write_asc(out_array, output_file, x0, y0, cell_size, nodata)
 
-      ! Calculate cell centers
-      do i = 1, nx
-         x_coords(i) = x0 + cell_size * (0.5 + (i - 1))
-      end do
+    IMPLICIT NONE
 
-      do i = 1, ny
-         y_coords(i) = y0 + cell_size * (0.5 + (i - 1))
-      end do
+    REAL(wp), INTENT(IN) :: out_array(:,:)
+    CHARACTER*50, INTENT(IN) :: output_file
+    REAL(wp), INTENT(IN) :: x0, y0
+    REAL(wp), INTENT(IN) :: cell_size
+    REAL(wp), INTENT(IN) :: nodata
 
-      ! Create a new NetCDF file (NetCDF4 format with HDF5 support)
-      retval = nf90_create(TRIM(output_file), nf90_netcdf4, ncid)
-      if (retval /= nf90_noerr) stop 'Error creating NetCDF file.'
+    INTEGER :: out_cells_x, out_cells_y
+    INTEGER :: j
 
-      ! Define dimensions for x and y
-      retval = nf90_def_dim(ncid, 'x', nx, x_dimid)
-      if (retval /= nf90_noerr) stop 'Error defining x dimension.'
-      retval = nf90_def_dim(ncid, 'y', ny, y_dimid)
-      if (retval /= nf90_noerr) stop 'Error defining y dimension.'
+    WRITE(*,*) "Saving asc file: ", TRIM(output_file)
 
-      ! Define the x and y coordinate variables
-      retval = nf90_def_var(ncid, 'x', nf90_double, [x_dimid], varid_x)
-      if (retval /= nf90_noerr) stop 'Error defining x variable.'
-      retval = nf90_def_var(ncid, 'y', nf90_double, [y_dimid], varid_y)
-      if (retval /= nf90_noerr) stop 'Error defining y variable.'
+    OPEN(output_unit,FILE=TRIM(output_file),status='unknown',form='formatted')
 
-      ! Define the 2D data variable
-      data_dimids = (/x_dimid, y_dimid/)
-      retval = nf90_def_var(ncid, 'data', nf90_double, data_dimids, varid_data)
-      if (retval /= nf90_noerr) stop 'Error defining data variable.'
+    out_cells_y = size(out_array, 1)
+    out_cells_x = size(out_array, 2)
 
-      ! Enable compression (level 4 as an example, ranges from 0 to 9)
-      retval = nf90_def_var_deflate(ncid, varid_data, shuffle=1, deflate=1, deflate_level=4)
-
-      ! Add metadata: units for the data and UTM zone
-      retval = nf90_put_att(ncid, varid_x, 'units', trim(units))
-      if (retval /= nf90_noerr) stop 'Error adding units attribute.'
-
-      retval = nf90_put_att(ncid, varid_x, 'long_name', 'Easting')
-      if (retval /= nf90_noerr) stop 'Error adding long_name attribute.'
-
-      retval = nf90_put_att(ncid, varid_x, 'standard_name', 'projection_x_coordinate')
-      if (retval /= nf90_noerr) stop 'Error adding standard_name attribute.'
-
-      retval = nf90_put_att(ncid, varid_y, 'units', trim(units))
-      if (retval /= nf90_noerr) stop 'Error adding units attribute.'
-
-      retval = nf90_put_att(ncid, varid_y, 'long_name', 'Northing')
-      if (retval /= nf90_noerr) stop 'Error adding long_name attribute.'
-
-      retval = nf90_put_att(ncid, varid_y, 'standard_name', 'projection_y_coordinate')
-      if (retval /= nf90_noerr) stop 'Error adding standard_name attribute.'
-
-      retval = nf90_put_att(ncid, varid_data, 'units', trim(units))
-      if (retval /= nf90_noerr) stop 'Error adding units attribute.'
+    WRITE(output_unit,'(A,I5)') 'ncols ', out_cells_x
+    WRITE(output_unit,'(A,I5)') 'nrows ', out_cells_y
+    WRITE(output_unit,'(A,F15.3)') 'xllcorner ', x0
+    WRITE(output_unit,'(A,F15.3)') 'yllcorner ', y0
+    WRITE(output_unit,'(A,F15.3)') 'cellsize ', cell_size
+    WRITE(output_unit,'(A,F15.3)') 'NODATA_value ', nodata
 
 
-      ! Add the _FillValue attribute for NoData value
-      retval = nf90_put_att(ncid, varid_data, '_FillValue', nodata_value)
-      if (retval /= nf90_noerr) stop 'Error adding _FillValue (NoData value) attribute.'
+    DO j = out_cells_y,1,-1
 
-      ! Define the CRS (UTM) as a scalar variable (no dimensions needed)
-      write(crs_name, '(I0)') utm_zone
-      crs_name = 'UTM_' // trim(crs_name)
-      retval = nf90_def_var(ncid, 'crs', nf90_char, crs_varid)
+       WRITE(output_unit,'(2000ES12.3E3)') out_array(j,1:out_cells_x)
 
-      ! Add CF-compliant attributes to define the UTM CRS
-      retval = nf90_put_att(ncid, crs_varid, 'grid_mapping_name', 'transverse_mercator')
-      retval = nf90_put_att(ncid, crs_varid, 'utm_zone_number', utm_zone)
-      retval = nf90_put_att(ncid, crs_varid, 'false_easting', 500000.0d0)
-      retval = nf90_put_att(ncid, crs_varid, 'false_northing', 0.0d0)
-      retval = nf90_put_att(ncid, crs_varid, 'scale_factor_at_central_meridian', 0.9996d0)
-      retval = nf90_put_att(ncid, crs_varid, 'longitude_of_central_meridian', &
+    ENDDO
+
+    CLOSE(output_unit)
+
+    WRITE(*,*) "Saving completed"
+
+  END SUBROUTINE write_asc
+
+  !***********************************************************************
+  !> @brief Replace dots with underscores in a character string.
+  !!
+  !! Scans the input string `in_str` and copies it into `out_str` after
+  !! replacing every occurrence of the character `'.'` with `'_'`.
+  !!
+  !! This routine is useful when preparing file names or variable-like
+  !! strings that should avoid dots in intermediate or derived text
+  !! representations.
+  !!
+  !! @param[in]  in_str   Input character string.
+  !! @param[out] out_str  Output character string with dots replaced by
+  !!                      underscores.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !***********************************************************************
+  SUBROUTINE replace_dot(in_str, out_str)
+
+    character(len=*), intent(in) :: in_str
+    character(len=*), intent(out) :: out_str
+    integer :: i
+    out_str = in_str
+    do i = 1, len_trim(in_str)
+       if (out_str(i:i) == '.') out_str(i:i) = '_'
+    end do
+  end subroutine replace_dot
+
+  subroutine parse_utm_zone(utm_zone_str, utm_zone, north_hemisphere)
+
+    implicit none
+
+    character(len=*), intent(in) :: utm_zone_str
+    integer, intent(out) :: utm_zone
+    logical, intent(out) :: north_hemisphere
+
+    character(len=8) :: tmp
+    integer :: n
+    character(len=1) :: hemi
+
+    tmp = adjustl(trim(utm_zone_str))
+    n = len_trim(tmp)
+
+    if (n < 2) then
+       write(*,*) 'Invalid UTM zone string: ', trim(utm_zone_str)
+       stop
+    end if
+
+    hemi = tmp(n:n)
+
+    select case (hemi)
+    case ('N','n')
+       north_hemisphere = .true.
+    case ('S','s')
+       north_hemisphere = .false.
+    case default
+       write(*,*) 'Invalid UTM hemisphere in: ', trim(utm_zone_str)
+       stop
+    end select
+
+    read(tmp(1:n-1),*) utm_zone
+
+    if (utm_zone < 1 .or. utm_zone > 60) then
+       write(*,*) 'Invalid UTM zone number: ', utm_zone
+       stop
+    end if
+
+  end subroutine parse_utm_zone
+
+  !***********************************************************************
+  !> @brief Write a two-dimensional array to a NetCDF raster file.
+  !!
+  !! Exports the input array `out_array` to a NetCDF file, together with
+  !! the spatial metadata needed to describe the computational grid.
+  !!
+  !! The subroutine defines the two-dimensional variable associated with
+  !! the raster field, writes the x and y coordinate axes based on the
+  !! lower-left corner coordinates and the grid cell size, and stores the
+  !! no-data value and additional metadata such as physical units and UTM
+  !! zone information.
+  !!
+  !! This routine is used to save model outputs in NetCDF format for
+  !! post-processing, visualization, and interoperability with external
+  !! analysis tools.
+  !!
+  !! @param[in] out_array      Two-dimensional array to be written to the
+  !!                           NetCDF file.
+  !! @param[in] output_file    Name of the output NetCDF file.
+  !! @param[in] x0             X coordinate of the lower-left corner of the
+  !!                           raster domain.
+  !! @param[in] y0             Y coordinate of the lower-left corner of the
+  !!                           raster domain.
+  !! @param[in] cell_size      Grid cell size.
+  !! @param[in] nodata_value   No-data value assigned to missing or invalid
+  !!                           cells.
+  !! @param[in] units          Physical units associated with the raster
+  !!                           variable.
+  !! @param[in] utm_zone       UTM zone metadata associated with the grid.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !***********************************************************************
+
+  SUBROUTINE write_netcdf_2d(out_array, output_file, x0, y0, cell_size,       &
+       nodata_value, units)
+
+    use netcdf
+    implicit none
+
+    REAL(wp), INTENT(IN) :: out_array(ny,nx)
+    CHARACTER(len=*), INTENT(IN) :: output_file
+    REAL(wp), INTENT(IN) :: x0, y0
+    REAL(wp), INTENT(IN) :: cell_size
+    REAL(wp), INTENT(IN) :: nodata_value
+    CHARACTER(len=*), INTENT(IN) :: units
+
+    REAL(wp) :: x_coords(nx)
+    REAL(wp) :: y_coords(ny)
+
+    integer :: ncid, x_dimid, y_dimid
+    integer :: varid_data, varid_x, varid_y, retval
+    integer :: crs_varid
+    integer :: data_dimids(2)
+    integer :: i, epsg_num
+
+    real(kind=8) :: false_northing
+    character(len=16) :: crs_name
+    character(len=16) :: epsg_code
+
+    ! Calculate cell centers
+    do i = 1, nx
+       x_coords(i) = x0 + cell_size * (0.5_wp + real(i - 1, wp))
+    end do
+
+    do i = 1, ny
+       y_coords(i) = y0 + cell_size * (0.5_wp + real(i - 1, wp))
+    end do
+
+    ! Hemisphere-dependent CRS info
+    if (north_hemisphere) then
+       false_northing = 0.0d0
+       epsg_num = 32600 + utm_zone
+    else
+       false_northing = 10000000.0d0
+       epsg_num = 32700 + utm_zone
+    end if
+
+    ! Create NetCDF file
+    retval = nf90_create(trim(output_file), nf90_netcdf4, ncid)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error creating NetCDF file: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    ! Define dimensions
+    retval = nf90_def_dim(ncid, 'x', nx, x_dimid)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error defining x dimension: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_def_dim(ncid, 'y', ny, y_dimid)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error defining y dimension: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    ! Define coordinate variables
+    retval = nf90_def_var(ncid, 'x', nf90_double, (/ x_dimid /), varid_x)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error defining x variable: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_def_var(ncid, 'y', nf90_double, (/ y_dimid /), varid_y)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error defining y variable: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    ! Define 2D data variable
+    data_dimids = (/ x_dimid, y_dimid /)
+    retval = nf90_def_var(ncid, 'data', nf90_double, data_dimids, varid_data)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error defining data variable: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_def_var_deflate(ncid, varid_data, shuffle=1, deflate=1, deflate_level=4)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error enabling compression: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    ! Coordinate metadata
+    retval = nf90_put_att(ncid, varid_x, 'units', 'm')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding x units attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, varid_x, 'long_name', 'Easting')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding x long_name attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, varid_x, 'standard_name', 'projection_x_coordinate')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding x standard_name attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, varid_y, 'units', 'm')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding y units attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, varid_y, 'long_name', 'Northing')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding y long_name attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, varid_y, 'standard_name', 'projection_y_coordinate')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding y standard_name attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, varid_data, 'units', trim(units))
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding data units attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, varid_data, '_FillValue', nodata_value)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding _FillValue attribute: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    ! Define CRS variable exactly like original logic
+    write(crs_name, '(I0)') utm_zone
+    crs_name = 'UTM_' // trim(crs_name)
+
+    retval = nf90_def_var(ncid, 'crs', nf90_char, crs_varid)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error defining crs variable: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, crs_varid, 'grid_mapping_name', 'transverse_mercator')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS grid_mapping_name: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, crs_varid, 'utm_zone_number', utm_zone)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS utm_zone_number: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, crs_varid, 'false_easting', 500000.0d0)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS false_easting: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, crs_varid, 'false_northing', false_northing)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS false_northing: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, crs_varid, 'scale_factor_at_central_meridian', 0.9996d0)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS scale_factor: ', trim(nf90_strerror(retval))
+       stop
+    end if
+
+    retval = nf90_put_att(ncid, crs_varid, 'longitude_of_central_meridian', &
          real(6 * utm_zone - 183, kind=8))
-      retval = nf90_put_att(ncid, crs_varid, 'latitude_of_projection_origin', 0.0d0)
-      retval = nf90_put_att(ncid, crs_varid, 'semi_major_axis', 6378137.0d0)
-      retval = nf90_put_att(ncid, crs_varid, 'inverse_flattening', 298.257223563d0)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS longitude_of_central_meridian: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      ! Add the EPSG code and WKT spatial reference attribute
-      retval = nf90_put_att(ncid, crs_varid, 'EPSG_code', 'EPSG:32633')  ! Replace XX with your UTM zone
+    retval = nf90_put_att(ncid, crs_varid, 'latitude_of_projection_origin', 0.0d0)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS latitude_of_projection_origin: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      ! Link the data variable to the CRS variable through 'grid_mapping'
-      retval = nf90_put_att(ncid, varid, 'grid_mapping', 'crs')
+    retval = nf90_put_att(ncid, crs_varid, 'semi_major_axis', 6378137.0d0)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS semi_major_axis: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      ! End define mode
-      retval = nf90_enddef(ncid)
-      if (retval /= nf90_noerr) stop 'Error ending define mode in NetCDF file.'
+    retval = nf90_put_att(ncid, crs_varid, 'inverse_flattening', 298.257223563d0)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS inverse_flattening: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      ! Write the x and y coordinate variables
-      retval = nf90_put_var(ncid, varid_x, x_coords)
-      if (retval /= nf90_noerr) stop 'Error writing x-coordinates.'
-      retval = nf90_put_var(ncid, varid_y, y_coords)
-      if (retval /= nf90_noerr) stop 'Error writing y-coordinates.'
+    write(epsg_code, '(A,I5.5)') 'EPSG:', epsg_num
+    retval = nf90_put_att(ncid, crs_varid, 'EPSG_code', trim(epsg_code))
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding CRS EPSG_code: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      ! Write the 2D data array
-      retval = nf90_put_var(ncid, varid_data, TRANSPOSE(out_array) )
-      if (retval /= nf90_noerr) stop 'Error writing 2D data array.'
+    retval = nf90_put_att(ncid, varid_data, 'grid_mapping', 'crs')
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error adding data grid_mapping: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      ! Close the NetCDF file
-      retval = nf90_close(ncid)
-      if (retval /= nf90_noerr) stop 'Error closing NetCDF file.'
+    ! End define mode
+    retval = nf90_enddef(ncid)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error ending define mode: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      WRITE(*,*) "NetCDF file created successfully: ", TRIM(output_file)
+    ! Write coordinates
+    retval = nf90_put_var(ncid, varid_x, x_coords)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error writing x-coordinates: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      RETURN
+    retval = nf90_put_var(ncid, varid_y, y_coords)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error writing y-coordinates: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-   end subroutine write_netcdf_2d
+    ! Write data as in original
+    retval = nf90_put_var(ncid, varid_data, transpose(out_array))
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error writing 2D data array: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-   !***********************************************************************
-   !> @brief Interpolate a 2D field from one grid onto another grid.
-   !!
-   !! Interpolates the input two-dimensional field `Zin_2D`, defined on the
-   !! structured grid described by the one-dimensional coordinate arrays
-   !! `xin_1D` and `yin_1D`, onto the output grid whose node coordinates are
-   !! given by `Xout_2D` and `Yout_2D`.
-   !!
-   !! For each point of the output grid, the subroutine identifies the
-   !! corresponding location in the input grid and computes the
-   !! interpolated value assigned to `Zout_2D`. This routine is used when
-   !! external raster fields must be remapped onto the computational grid
-   !! of the model.
-   !!
-   !! @param[in]  xin_1D   One-dimensional array of x coordinates of the
-   !!                      input grid.
-   !! @param[in]  yin_1D   One-dimensional array of y coordinates of the
-   !!                      input grid.
-   !! @param[in]  Zin_2D   Two-dimensional field defined on the input grid.
-   !! @param[in]  Xout_2D  Two-dimensional array of x coordinates of the
-   !!                      output grid.
-   !! @param[in]  Yout_2D  Two-dimensional array of y coordinates of the
-   !!                      output grid.
-   !! @param[out] Zout_2D  Two-dimensional interpolated field defined on
-   !!                      the output grid.
-   !!
-   !! @date 2026-04-02
-   !! @author M. de' Michieli Vitturi
-   !! @author S. Tarquini
-   !***********************************************************************
-   SUBROUTINE interp2Dgrids(xin_1D, yin_1D, Zin_2D, Xout_2D, Yout_2D, Zout_2D)
+    retval = nf90_close(ncid)
+    if (retval /= nf90_noerr) then
+       write(*,*) 'Error closing NetCDF file: ', trim(nf90_strerror(retval))
+       stop
+    end if
 
-      implicit none
+    write(*,*) 'NetCDF file created successfully: ', trim(output_file)
 
-      ! Input parameters
-      real(wp), intent(in) :: xin_1D(:), yin_1D(:)  ! Original grid (1D)
-      real(wp), intent(in) :: Zin_2D(:,:)           ! Original grid Z values (2D)
-      real(wp), intent(in) :: Xout_2D(:,:), Yout_2D(:,:)  ! New grid (2D)
+  END SUBROUTINE write_netcdf_2d
 
-      ! Output parameter
-      real(wp), ALLOCATABLE, intent(out) :: Zout_2D(:,:)  ! Interpolated output (2D)
+  !***********************************************************************
+  !> @brief Interpolate a 2D field from one grid onto another grid.
+  !!
+  !! Interpolates the input two-dimensional field `Zin_2D`, defined on the
+  !! structured grid described by the one-dimensional coordinate arrays
+  !! `xin_1D` and `yin_1D`, onto the output grid whose node coordinates are
+  !! given by `Xout_2D` and `Yout_2D`.
+  !!
+  !! For each point of the output grid, the subroutine identifies the
+  !! corresponding location in the input grid and computes the
+  !! interpolated value assigned to `Zout_2D`. This routine is used when
+  !! external raster fields must be remapped onto the computational grid
+  !! of the model.
+  !!
+  !! @param[in]  xin_1D   One-dimensional array of x coordinates of the
+  !!                      input grid.
+  !! @param[in]  yin_1D   One-dimensional array of y coordinates of the
+  !!                      input grid.
+  !! @param[in]  Zin_2D   Two-dimensional field defined on the input grid.
+  !! @param[in]  Xout_2D  Two-dimensional array of x coordinates of the
+  !!                      output grid.
+  !! @param[in]  Yout_2D  Two-dimensional array of y coordinates of the
+  !!                      output grid.
+  !! @param[out] Zout_2D  Two-dimensional interpolated field defined on
+  !!                      the output grid.
+  !!
+  !! @date 2026-04-02
+  !! @author M. de' Michieli Vitturi
+  !! @author S. Tarquini
+  !***********************************************************************
+  SUBROUTINE interp2Dgrids(xin_1D, yin_1D, Zin_2D, Xout_2D, Yout_2D, Zout_2D)
 
-      ! Local variables
-      integer :: nx_in, ny_in             ! Size of original grid
-      integer :: nx_out, ny_out           ! Size of new grid
+    implicit none
 
-      real(wp) :: xinMin, yinMin, cellin
-      real(wp), ALLOCATABLE :: xi(:), yi(:)
-      real(wp), ALLOCATABLE :: xi_fract(:), yi_fract(:)
-      real(wp), ALLOCATABLE :: xi_out_yi(:, :)
-      integer, ALLOCATABLE :: ix(:), iy(:), ix1(:), iy1(:)
-      integer :: i, j
+    ! Input parameters
+    real(wp), intent(in) :: xin_1D(:), yin_1D(:)  ! Original grid (1D)
+    real(wp), intent(in) :: Zin_2D(:,:)           ! Original grid Z values (2D)
+    real(wp), intent(in) :: Xout_2D(:,:), Yout_2D(:,:)  ! New grid (2D)
 
-      nx_in = size(xin_1D)
-      ny_in = size(yin_1D)
+    ! Output parameter
+    real(wp), ALLOCATABLE, intent(out) :: Zout_2D(:,:)  ! Interpolated output (2D)
 
-      nx_out = size(Xout_2D,2)
-      ny_out = size(Xout_2D,1)
+    ! Local variables
+    integer :: nx_in, ny_in             ! Size of original grid
+    integer :: nx_out, ny_out           ! Size of new grid
 
-      ALLOCATE(Zout_2D(ny_out,nx_out))
-      ALLOCATE(xi(ny_out),yi(nx_out))
-      ALLOCATE(xi_fract(ny_out),yi_fract(nx_out))
-      ALLOCATE( xi_out_yi(ny_out, nx_out) )
-      ALLOCATE ( ix(nx_out), iy(ny_out), ix1(nx_out), iy1(ny_out) )
+    real(wp) :: xinMin, yinMin, cellin
+    real(wp), ALLOCATABLE :: xi(:), yi(:)
+    real(wp), ALLOCATABLE :: xi_fract(:), yi_fract(:)
+    real(wp), ALLOCATABLE :: xi_out_yi(:, :)
+    integer, ALLOCATABLE :: ix(:), iy(:), ix1(:), iy1(:)
+    integer :: i, j
 
-      ! Compute minimum values and cell size for the original grid
-      xinMin = minval(xin_1D)
-      yinMin = minval(yin_1D)
-      cellin = xin_1D(2) - xin_1D(1)
+    nx_in = size(xin_1D)
+    ny_in = size(yin_1D)
 
-      ! Calculate the positions of the target points in terms of the original grid
-      xi = (Xout_2D(1, :) - xinMin) / cellin
-      yi = (Yout_2D(:, 1) - yinMin) / cellin
+    nx_out = size(Xout_2D,2)
+    ny_out = size(Xout_2D,1)
 
-      ! Compute ix and iy, ensuring indices are within bounds
-      do i = 1, nx_out
-         ix(i) = max(1, min(nx_in-1, ceiling(xi(i))))
-         ix1(i) = ix(i) + 1
-      end do
+    ALLOCATE(Zout_2D(ny_out,nx_out))
+    ALLOCATE(xi(ny_out),yi(nx_out))
+    ALLOCATE(xi_fract(ny_out),yi_fract(nx_out))
+    ALLOCATE( xi_out_yi(ny_out, nx_out) )
+    ALLOCATE ( ix(nx_out), iy(ny_out), ix1(nx_out), iy1(ny_out) )
 
-      do j = 1, ny_out
-         iy(j) = max(1, min(ny_in-1, ceiling(yi(j))))
-         iy1(j) = iy(j) + 1
-      end do
+    ! Compute minimum values and cell size for the original grid
+    xinMin = minval(xin_1D)
+    yinMin = minval(yin_1D)
+    cellin = xin_1D(2) - xin_1D(1)
 
-      ! Compute fractional coordinates within each cell
-      xi_fract = max(0.0_wp, min(1.0_wp, xi - real(ix) + 1.0_wp))
-      yi_fract = max(0.0_wp, min(1.0_wp, yi - real(iy) + 1.0_wp))
+    ! Calculate the positions of the target points in terms of the original grid
+    xi = (Xout_2D(1, :) - xinMin) / cellin
+    yi = (Yout_2D(:, 1) - yinMin) / cellin
 
-      ! Compute the bilinear interpolation factors
-      do j = 1, ny_out
-         do i = 1, nx_out
-            xi_out_yi(j, i) = yi_fract(j) * xi_fract(i)
-         end do
-      end do
+    ! Compute ix and iy, ensuring indices are within bounds
+    do i = 1, nx_out
+       ix(i) = max(1, min(nx_in-1, ceiling(xi(i))))
+       ix1(i) = ix(i) + 1
+    end do
 
-      ! Perform bilinear interpolation
-      do j = 1, ny_out
-         do i = 1, nx_out
-            Zout_2D(j, i) = xi_out_yi(j, i) * Zin_2D(iy1(j), ix1(i)) + &
+    do j = 1, ny_out
+       iy(j) = max(1, min(ny_in-1, ceiling(yi(j))))
+       iy1(j) = iy(j) + 1
+    end do
+
+    ! Compute fractional coordinates within each cell
+    xi_fract = max(0.0_wp, min(1.0_wp, xi - real(ix) + 1.0_wp))
+    yi_fract = max(0.0_wp, min(1.0_wp, yi - real(iy) + 1.0_wp))
+
+    ! Compute the bilinear interpolation factors
+    do j = 1, ny_out
+       do i = 1, nx_out
+          xi_out_yi(j, i) = yi_fract(j) * xi_fract(i)
+       end do
+    end do
+
+    ! Perform bilinear interpolation
+    do j = 1, ny_out
+       do i = 1, nx_out
+          Zout_2D(j, i) = xi_out_yi(j, i) * Zin_2D(iy1(j), ix1(i)) + &
                (xi_fract(i) - xi_out_yi(j, i)) * Zin_2D(iy(j), ix1(i)) + &
                (yi_fract(j) - xi_out_yi(j, i)) * Zin_2D(iy1(j), ix(i)) + &
                (1.0_wp - xi_fract(i) - yi_fract(j) + xi_out_yi(j, i)) * Zin_2D(iy(j), ix(i))
-         end do
-      end do
+       end do
+    end do
 
-   end subroutine interp2Dgrids
+  end subroutine interp2Dgrids
 
 END MODULE inpout

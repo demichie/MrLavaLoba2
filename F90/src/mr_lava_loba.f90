@@ -82,7 +82,7 @@ PROGRAM mr_lava_loba
    IF ( nc_flag) THEN
 
       output_file = trim(run_name) // '_thickness_full' // '.nc'
-      CALL write_netcdf_2d(Zflow, output_file, lx, ly, cell, 0.0_wp, 'm', 33 )
+      CALL write_netcdf_2d(Zflow, output_file, lx, ly, cell, 0.0_wp, 'm')
 
    END IF
 

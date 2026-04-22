@@ -27,6 +27,7 @@ MODULE parameters
 
    REAL(wp), PARAMETER :: eps = epsilon(1.0_wp)
 
+   character(len=8) :: utm_zone_str
 
    CHARACTER(LEN=50) :: run_name
    CHARACTER(LEN=50) :: source
